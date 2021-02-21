@@ -13,7 +13,7 @@
 typedef struct appData {
 	drflac *pFlac;
 	FIL *currentFile;
-	uint8_t framesToRead; //doublebuf size
+	uint16_t framesToRead; //doublebuf size
 
 } appData;
 
@@ -38,7 +38,7 @@ typedef enum {
 } FLAC_HANDLER_STATUS;
 
 typedef enum {
-	BUFFER_FILLED, BUFFER_PARTIAL_FILLED, BUFFER_ERROR,
+	FLAC_PCM_STATUS_FILLED, FLAC_PCM_STATUS_PARTIAL_FILLED, FLAC_PCM_STATUS_ERROR,
 } FLAC_PCM_STATUS;
 
 FLAC_HANDLER_STATUS drFlac_play(FIL *file);

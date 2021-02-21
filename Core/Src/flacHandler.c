@@ -35,7 +35,7 @@ static appData myData;
 static SongData songData;
 static SongStreamProperties songStreamProperties;
 
-static drflac_int16 pBufferOut[192 * 8];
+static drflac_int16 volatile flacPCMBuffer[192 * 8];
 
 void _setupDr_flac() {
 	allocationCallbacks.pUserData = &myData;
@@ -134,7 +134,7 @@ void _drflac_onMeta(void *pUserData, drflac_metadata *pMetadata) {
 	}
 
 //set frames to read somewhere
-	myData.framesToRead = 192 * 2; //arbitrary number ATm!
+	myData.framesToRead = 200; //arbitrary number ATm!
 
 }
 
@@ -233,23 +233,27 @@ FLAC_PCM_STATUS drFlac_updatePCMBatch() {
 
 	if (songStreamProperties.bits == 16) {
 		uint16_t samplesProvided = drflac_read_pcm_frames_s16(myData.pFlac,
-				myData.framesToRead, pBufferOut);
+				myData.framesToRead, flacPCMBuffer);
 		if (samplesProvided == 0) {
-			return BUFFER_ERROR;
+			return FLAC_PCM_STATUS_ERROR;
 		} else if (samplesProvided < myData.framesToRead) {
 
 			//set rest of buffer to zero
-			memset(&pBufferOut[samplesProvided], 0,
+			memset(&flacPCMBuffer[samplesProvided], 0,
 					(myData.framesToRead - samplesProvided));
-
+//setnd FLAC_PCM_STATUS_PARTIAL
 		} else {
 			//all samples filled
-			return BUFFER_FILLED;
+
 		}
 
+		putBuffer(&flacPCMBuffer, myData.framesToRead);
+return FLAC_PCM_STATUS_FILLED;
 	}
 
+
+
 //other bit stuff not imlemented
-	return BUFFER_ERROR;
+	return FLAC_PCM_STATUS_ERROR;
 
 }

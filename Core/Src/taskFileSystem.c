@@ -9,7 +9,7 @@
 #include "xprintf.h"
 #include "stdint.h"
 #include "ff.h"
-
+#include "utils.h"
 //#include "audiodev.h"
 #include "flacHandler.h"
 
@@ -59,9 +59,7 @@ void StartTaskFS(void *argument) {
 	/* File handle */
 	FIL fil;
 
-	/* Used for bytes written, and bytes read */
-	UINT bw = 999;
-	UINT br = 0;
+
 
 	/* Sets a valid date for when writing to file */
 	//set_fattime (1980, 1, 1, 0, 0, 0);
@@ -91,6 +89,7 @@ void StartTaskFS(void *argument) {
 
 	current_file_index = 0;
 //	flac_play_song(GetCurrentFilePath());
+	initBuffer(0, 0);
 
 	FRESULT res = f_open(&fil, GetCurrentFilePath(), FA_READ);
 	if (res == FR_OK) {
@@ -98,46 +97,54 @@ void StartTaskFS(void *argument) {
 		if (drFlac_play(&fil) == FLAC_DECODER_READY) {
 			uint8_t run = 1, divider = 0;
 			bench = 1;
-		//	TickType_t start = xTaskGetTickCount();
-		//	TickType_t end = 0;
+			//	TickType_t start = xTaskGetTickCount();
+			//	TickType_t end = 0;
 			xprintf("starting PCM decoding\n");
-		//	start = xTaskGetTickCount();
+			//	start = xTaskGetTickCount();
 			while (run) {
-
-				FLAC_PCM_STATUS res = drFlac_updatePCMBatch();
-
-				switch (res) {
-				case BUFFER_FILLED:
-					//all ok
-					divider = (divider + 1) % 10;
-					if (divider == 0) {
-						if (bench) {
-							bench = 0;
-						} else
-							bench = 1;
-					}
-					break;
-				case BUFFER_PARTIAL_FILLED:
-					//last decoder session
-					xprintf("Buffer Partly filled\n");
-					bench = 250;
-					break;
-
-				case BUFFER_ERROR:
-					xprintf("Error getting PCM\n");
-				//	end =xTaskGetTickCount();
-				//	xprintf("total decoding time of song: %d\n", (end - start));
-					//error
-					//handle error
-					bench = 100;
-					while (1) {
-						//vTaskDelay(1000);
-					}
-					break;
-				default:
-					//
-					//bench +0;
+				uint16_t availableInt16RoomInBuffer = getFreeSlotsInBuffer()
+						/ 2;
+				if (availableInt16RoomInBuffer > 200) {
+					xprintf("Slots free: %d\n", availableInt16RoomInBuffer)
 					;
+
+					FLAC_PCM_STATUS res = drFlac_updatePCMBatch();
+
+					switch (res) {
+					case FLAC_PCM_STATUS_FILLED:
+						//all ok
+						divider = (divider + 1) % 10;
+						if (divider == 0) {
+							if (bench) {
+								bench = 0;
+							} else
+								bench = 1;
+						}
+						break;
+					case FLAC_PCM_STATUS_PARTIAL_FILLED:
+						//last decoder session
+						xprintf("Buffer Partly filled\n");
+						bench = 250;
+						break;
+
+					case FLAC_PCM_STATUS_ERROR:
+						xprintf("Error getting PCM\n");
+						//	end =xTaskGetTickCount();
+						//	xprintf("total decoding time of song: %d\n", (end - start));
+						//error
+						//handle error
+						bench = 100;
+						run = 0;
+						while (1) {
+							//vTaskDelay(1000);
+						}
+						break;
+					default:
+						//
+						//bench +0;
+						;
+					}
+
 				}
 			}
 

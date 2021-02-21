@@ -59,6 +59,9 @@ extern "C" {
 #endif /* AUDIO_FS_BINTERVAL */
 
 #define AUDIO_OUT_EP                                  0x01U
+#define AUDIO_IN_EP                                  0x81U
+
+
 #define USB_AUDIO_CONFIG_DESC_SIZ                     0x6DU
 #define AUDIO_INTERFACE_DESC_SIZE                     0x09U
 #define USB_AUDIO_DESC_SIZ                            0x09U
@@ -104,6 +107,8 @@ extern "C" {
 
 
 #define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U))
+#define AUDIO_IN_PACKET  AUDIO_OUT_PACKET
+
 #define AUDIO_DEFAULT_VOLUME                          70U
 
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
