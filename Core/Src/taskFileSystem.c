@@ -21,8 +21,8 @@ static const char* GetCurrentFilePath(void);
 /*
  * Statics vars
  */
-static FATFS fs;
-static Files files;
+static FATFS fs __attribute__((section("ccmram")));;
+static Files files __attribute__((section("ccmram")));;
 static int current_file_index = 0;
 
 static uint8_t bench = 0;
@@ -102,9 +102,9 @@ void StartTaskFS(void *argument) {
 			xprintf("starting PCM decoding\n");
 			//	start = xTaskGetTickCount();
 			while (run) {
-				uint16_t availableInt16RoomInBuffer = getFreeSlotsInBuffer()
-						/ 2;
-				if (availableInt16RoomInBuffer > 200) {
+				uint8_t availableInt16RoomInBuffer = getFreeSlotsInBuffer();
+
+				if (availableInt16RoomInBuffer > 0) {
 					xprintf("Slots free: %d\n", availableInt16RoomInBuffer)
 					;
 

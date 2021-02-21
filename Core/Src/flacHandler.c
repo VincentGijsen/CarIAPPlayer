@@ -31,11 +31,12 @@ void my_free(void *p, void *pUserData) {
 static drflac_allocation_callbacks allocationCallbacks;
 static uint8_t drFlac_allocationConfigured = 0;
 
-static appData myData;
-static SongData songData;
-static SongStreamProperties songStreamProperties;
+static appData myData ;
+static SongData songData ;
+static SongStreamProperties songStreamProperties __attribute__((section("ccmram")));;
 
-static drflac_int16 volatile flacPCMBuffer[192 * 8];
+static volatile drflac_int16  flacPCMBuffer[96 * 1] __attribute__((section("ccmram")));;
+
 
 void _setupDr_flac() {
 	allocationCallbacks.pUserData = &myData;
@@ -134,7 +135,7 @@ void _drflac_onMeta(void *pUserData, drflac_metadata *pMetadata) {
 	}
 
 //set frames to read somewhere
-	myData.framesToRead = 200; //arbitrary number ATm!
+	myData.framesToRead = 88; //arbitrary number ATm!
 
 }
 
@@ -230,6 +231,7 @@ FLAC_HANDLER_STATUS drFlac_play(FIL *file) {
 
 FLAC_PCM_STATUS drFlac_updatePCMBatch() {
 	//xprintf("requesting PCM batch\n");
+
 
 	if (songStreamProperties.bits == 16) {
 		uint16_t samplesProvided = drflac_read_pcm_frames_s16(myData.pFlac,

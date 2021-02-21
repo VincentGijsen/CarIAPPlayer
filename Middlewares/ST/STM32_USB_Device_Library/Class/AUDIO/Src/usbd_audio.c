@@ -64,8 +64,10 @@
 #include "usbd_ctlreq.h"
 
 #include "utils.h"
-static uint8_t _usb_buf_audio[96];
-static uint32_t PlayFlag = 0;
+
+
+_AUDIO_FRAME volatile *_usb_audio_frame = 0;
+volatile uint32_t PlayFlag = 0;
 
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
  * @{
@@ -507,10 +509,12 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 
 	USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
 	//if (buffer_ready == 1) {
+	flagDataAsRead();
+	getBuffer(&_usb_audio_frame);
 
-	getBuffer(_usb_buf_audio, 176);
-
-	USBD_LL_Transmit(pdev, AUDIO_IN_EP, _usb_buf_audio, 176); //length in words to bytes
+	if(_usb_audio_frame){
+		USBD_LL_Transmit(pdev, AUDIO_IN_EP, _usb_audio_frame->frame, _usb_audio_frame->len); //length in words to bytes
+	}
 
 // else {
 //    DCD_EP_Tx (pdev,AUDIO_IN_EP, (uint8_t*)(RecBuf0), AUDIO_IN_PACKET);//length in words to bytes
