@@ -187,10 +187,12 @@ AUDIO_INTERFACE_DESCRIPTOR_TYPE, /* bDescriptorType */
 AUDIO_CONTROL_INPUT_TERMINAL, /* bDescriptorSubtype */
 0x01, /* bTerminalID */
 0x01, /* wTerminalType AUDIO_TERMINAL_USB_STREAMING   0x0101 */
-0x02, 0x00, /* bAssocTerminal */
-0x01, /* bNrChannels */
-0x00, /* wChannelConfig 0x0000  Mono */
-0x00, 0x00, /* iChannelNames */
+0x02,
+0x00, /* bAssocTerminal */
+0x02, /* bNrChannels */
+0x03, /* wChannelConfig 0x0000  Mono */
+0x00,
+0x00, /* iChannelNames */
 0x00, /* iTerminal */
 /* 12 byte*/
 
@@ -509,7 +511,11 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 
 	USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
 	//if (buffer_ready == 1) {
-	flagDataAsRead();
+	if(BUFFER_ERROR == flagDataAsRead())
+	{
+		//xprintf("buff-empty\n");
+		return (uint8_t) USBD_OK;
+	}
 	getBuffer(&_usb_audio_frame);
 
 	if(_usb_audio_frame){

@@ -31,12 +31,15 @@ void my_free(void *p, void *pUserData) {
 static drflac_allocation_callbacks allocationCallbacks;
 static uint8_t drFlac_allocationConfigured = 0;
 
-static appData myData ;
-static SongData songData ;
-static SongStreamProperties songStreamProperties __attribute__((section("ccmram")));;
+static appData myData;
+__attribute__((section("CCMRAM")));
+static SongData songData;
+__attribute__((section("ccmram")));
+static SongStreamProperties songStreamProperties __attribute__((section("ccmram")));
+;
 
-static volatile drflac_int16  flacPCMBuffer[96 * 1] __attribute__((section("ccmram")));;
-
+static volatile drflac_int16 flacPCMBuffer[96 * 1] __attribute__((section("ccmram")));
+;
 
 void _setupDr_flac() {
 	allocationCallbacks.pUserData = &myData;
@@ -83,20 +86,26 @@ void _drflac_onMeta(void *pUserData, drflac_metadata *pMetadata) {
 
 		for (int x = 0; x < pMetadata->data.vorbis_comment.commentCount; x++) {
 			drflac_uint32 pCommentLengthOut;
-			//
-
+			//used for extracting info
+			uint8_t maxTmpStrLen = MAX_META_STR_LEN + 7;
+			uint8_t contentStrLeng = 0;
 			const char *s = drflac_next_vorbis_comment(&pIt,
 					&pCommentLengthOut);
-			char temp[pCommentLengthOut + 1];
 
+			char temp[MAX_META_STR_LEN + 7];
+
+			//cap length of target to max size
+			if (pCommentLengthOut > maxTmpStrLen - 1) {
+				pCommentLengthOut = maxTmpStrLen - 1;
+			}
 			memcpy(&temp, s, pCommentLengthOut);
-			//add string terminator
-			temp[pCommentLengthOut] = '\0';
+			//add string terminator to final 'store'
+			temp[pCommentLengthOut - 1] = '\0';
 			//memccpy()
 			xprintf("meta: %s\n", temp);
 
-			uint8_t offset = 0, valueLength = 0;
-			uint8_t dummy = 0;
+			//	uint8_t offset = 0, valueLength = 0;
+			//	uint8_t dummy = 0;
 
 #define ALBUM_STR_VAL "ALBUM="
 #define ALBUM_STR_LEN sizeof(ALBUM_STR_VAL) -1 //don't include \0
@@ -108,18 +117,25 @@ void _drflac_onMeta(void *pUserData, drflac_metadata *pMetadata) {
 #define ARTIST_STR_LEN sizeof(ALBUM_STR_VAL) -1 //don't include \0
 
 			if (startsWith(&temp[0], ALBUM_STR_VAL, ALBUM_STR_LEN)) {
-				songData.album = malloc(pCommentLengthOut + 1 - ALBUM_STR_LEN);
-				memcpy(songData.album, &temp[ALBUM_STR_LEN],
-						(pCommentLengthOut + 1 - ALBUM_STR_LEN));
+
+				//start copieing from after key value
+				contentStrLeng = pCommentLengthOut - ALBUM_STR_LEN;
+				if (contentStrLeng >= contentStrLeng)
+					contentStrLeng = contentStrLeng - 1;
+				memcpy(songData.album, &temp[ALBUM_STR_LEN], contentStrLeng);
+				songData.album[contentStrLeng - 1] = '\0';
+
 				songData.fieldsInited++;
 
 			} else if (startsWith(&temp[0], TITLE_STR_VAL, TITLE_STR_LEN)) {
-
-				songData.title = malloc(pCommentLengthOut + 1 - ALBUM_STR_LEN);
+//TODO: implement
+				//songData.title = malloc(pCommentLengthOut + 1 - ALBUM_STR_LEN);
 				songData.fieldsInited++;
 			} else if (startsWith(&temp[0], ARTIST_STR_VAL, ARTIST_STR_LEN)) {
-				songData.artists = malloc(
-						pCommentLengthOut + 1 - ARTIST_STR_LEN);
+//TODO: implement
+				//songData.artists = malloc(
+				//pCommentLengthOut + 1 - ARTIST_STR_LEN
+				//);
 				songData.fieldsInited++;
 			}
 		}
@@ -180,9 +196,9 @@ size_t _drflac_onSeek(void *pUserData, int offset, drflac_seek_origin origin) {
 void drFlac_stop() {
 //clean up
 
-	free(songData.title);
-	free(songData.album);
-	free(songData.artists);
+	//free(songData.title);
+	//free(songData.album);
+	//free(songData.artists);
 	songData.fieldsInited = 0;
 
 	free(myData.currentFile);
@@ -198,7 +214,12 @@ FLAC_HANDLER_STATUS drFlac_play(FIL *file) {
 	}
 	drFlac_stop();
 
+	//reset decoder stufs;
 	myData.currentFile = file;
+	myData.aditional_frames_on_interval = 0;
+	myData.framecnt = 0;
+	myData.interval_for_extra_frames = 0;
+	myData.bytes_per_sample = 0;
 
 //TODO: implemeent stop/clear check before start
 
@@ -230,32 +251,65 @@ FLAC_HANDLER_STATUS drFlac_play(FIL *file) {
 }
 
 FLAC_PCM_STATUS drFlac_updatePCMBatch() {
-	//xprintf("requesting PCM batch\n");
 
+	switch (songStreamProperties.freq) {
+	case FLAC_HZ_44100:
+		myData.framesToRead = FLAC_SAMPLES_MS_44100_16BIT;
+		myData.aditional_frames_on_interval =
+		FLAC_SAMPLES_MS_44100_16BIT_EXTRA_EACH_FRAMES;
+		myData.interval_for_extra_frames =
+		FLAC_SAMPLES_MS_44100_16BIT_EXTRA_EACH_FRAMES_TO_INSERT;
+		myData.bytes_per_sample = FLAC_SAMPLES_MS_44100_16BIT_BYTES_PER_SAMPLE;
+		break;
 
-	if (songStreamProperties.bits == 16) {
-		uint16_t samplesProvided = drflac_read_pcm_frames_s16(myData.pFlac,
-				myData.framesToRead, flacPCMBuffer);
-		if (samplesProvided == 0) {
-			return FLAC_PCM_STATUS_ERROR;
-		} else if (samplesProvided < myData.framesToRead) {
+	case FLAC_HZ_48000:
+		myData.framesToRead = FLAC_SAMPLES_MS_48000_16BIT;
+		myData.aditional_frames_on_interval =
+		FLAC_SAMPLES_MS_48000_16BIT_EXTRA_EACH_FRAMES;
+		myData.interval_for_extra_frames =
+		FLAC_SAMPLES_MS_48000_16BIT_EXTRA_EACH_FRAMES_TO_INSERT;
+		myData.bytes_per_sample = FLAC_SAMPLES_MS_48000_16BIT_BYTES_PER_SAMPLE;
+		break;
 
-			//set rest of buffer to zero
-			memset(&flacPCMBuffer[samplesProvided], 0,
-					(myData.framesToRead - samplesProvided));
-//setnd FLAC_PCM_STATUS_PARTIAL
-		} else {
-			//all samples filled
+	default:
+		//error:
+		return FLAC_PCM_STATUS_ERROR;
+		;
+	}
+	uint8_t frames_to_get = myData.framesToRead;
 
+	//additional frame logic
+	if (myData.interval_for_extra_frames > 0) {
+		myData.framecnt++;
+
+		if (myData.framecnt == myData.interval_for_extra_frames
+				&& (myData.framecnt > 0)) {
+			myData.framecnt = 1; //carefull, 0 is reserved for disabled;
+			frames_to_get += myData.aditional_frames_on_interval;
 		}
+	}
+	uint16_t samplesProvided = drflac_read_pcm_frames_s16(myData.pFlac,
+			frames_to_get, flacPCMBuffer);
 
-		putBuffer(&flacPCMBuffer, myData.framesToRead);
-return FLAC_PCM_STATUS_FILLED;
+	//check result of decoding run
+	if (samplesProvided == 0) {
+		return FLAC_PCM_STATUS_ERROR;
+	} else if (samplesProvided < frames_to_get) {
+
+		//set rest of buffer to zero
+		memset(flacPCMBuffer[samplesProvided], 0,
+				(frames_to_get - samplesProvided));
+//setnd FLAC_PCM_STATUS_PARTIAL
+	} else {
+		//all samples filled
+
 	}
 
-
+	putBuffer(&flacPCMBuffer, frames_to_get, myData.bytes_per_sample);
+	return FLAC_PCM_STATUS_FILLED;
+	//}
 
 //other bit stuff not imlemented
-	return FLAC_PCM_STATUS_ERROR;
+	//return FLAC_PCM_STATUS_ERROR;
 
 }

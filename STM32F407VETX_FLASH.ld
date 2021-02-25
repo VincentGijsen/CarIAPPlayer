@@ -31,8 +31,8 @@ ENTRY(Reset_Handler)
 /* Highest address of the user mode stack */
 _estack = ORIGIN(RAM) + LENGTH(RAM);	/* end of "RAM" Ram type memory */
 
-_Min_Heap_Size = 0x200 ;	/* required amount of heap  */
-_Min_Stack_Size = 0x400 ;	/* required amount of stack */
+_Min_Heap_Size = 0x400 ;	/* required amount of heap  */
+_Min_Stack_Size = 0x800 ;	/* required amount of stack */
 
 /* Memories definition */
 MEMORY
@@ -167,6 +167,23 @@ SECTIONS
     . = ALIGN(8);
   } >RAM
 
+/* CCM-RAM section 
+  * 
+  * IMPORTANT NOTE! 
+  * If variables placed in this section must be zero initialized,
+  * the startup code needs to be modified to initialize this section.  
+  */
+ .ccmram :
+  {
+    . = ALIGN(4);
+    _sccmram = .;       /* create a global symbol at ccmram start */
+    *(.ccmram)
+    *(.ccmram*)
+    
+    . = ALIGN(4);
+    _eccmram = .;       /* create a global symbol at ccmram end */
+  } >CCMRAM
+ 
   /* Remove information from the compiler libraries */
   /DISCARD/ :
   {

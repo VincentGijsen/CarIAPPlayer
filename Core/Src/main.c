@@ -73,6 +73,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 	xdev_out(ITM_SendChar);
 	  	xprintf("Starting up\n");
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/

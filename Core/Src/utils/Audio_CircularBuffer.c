@@ -13,7 +13,9 @@
 BUFFER_RESULT _putSinglePkg(void *pkg);
 
 //global data structures
-static volatile AUDIO_CircularBuffer_t _buffer;
+static volatile AUDIO_CircularBuffer_t _buffer __attribute__((section("ccmram")));
+;
+;
 
 //#define CIRC_BUFFER_SIZE 1540 //192 *8 + some more // ((MAX_freq * CHANNELS *BYTESPerFrame )
 //static uint8_t _actual_buffer[CIRC_BUFFER_SIZE];
@@ -52,11 +54,11 @@ uint16_t getFreeSlotsInBuffer() {
 
 	if (_buffer.pRead < _buffer.pWrite) {
 		//freespace is parts between writepointer and end-of-buffer + the stuff before from 0 -> readpointer
-		return ((_buffer.slots - _buffer.pWrite) + _buffer.pRead - 1);
+		return ((_buffer.slots - _buffer.pWrite) + _buffer.pRead);
 	} else if (_buffer.pRead > _buffer.pWrite) {
 		//we asume the writepointer has wrapped, as the readpointer shall never be past the wr_ptr
 		//only space between write-pointer -> read->pointer is free,
-		return (_buffer.pRead - _buffer.pWrite - 1);
+		return (_buffer.pRead - _buffer.pWrite);
 	} else {
 		//(_buffer.pRead == _buffer.pWrite)
 		return _buffer.slots;
@@ -91,20 +93,24 @@ void _guard_write_and_increment() {
 
 //assumes free slots are available!
 //getting refrence to new WRITE-ref also increments the slot
-BUFFER_RESULT putBuffer(uint16_t *pcmSamples, uint8_t len) {
+BUFFER_RESULT putBuffer(uint16_t *pcmSamples, uint8_t len,
+		uint8_t bytesPerSample) {
 	if (!_buffer.Isinitialized)
 		return BUFFER_ERROR;
 
 	//te first time, we start at frame 1
 	_guard_write_and_increment();
-	for (uint16_t x = 0; x < len; x++) {
-		uint16_t doubleIdx = x * 2;
-		_buffer.data[_buffer.pWrite].frame[doubleIdx] = (pcmSamples[x] & 0xff);
-		_buffer.data[_buffer.pWrite].frame[doubleIdx + 1] =
-				(pcmSamples[x] >> 8);
+
+#define MSB (pcmSamples[x] & 0xff)
+#define LSB ((pcmSamples[x] >> 8)&0xff)
+
+
+	for (uint8_t x = 0; x < len; x++) {
+		_buffer.data[_buffer.pWrite].frame[(x * 2)] = MSB;
+		_buffer.data[_buffer.pWrite].frame[(x * 2) + 1] = LSB;
 
 	}
-	_buffer.data[_buffer.pWrite].len = len;
+	_buffer.data[_buffer.pWrite].len = (len * bytesPerSample); //we doubled # of frames as 16bit ->2x 8bit
 
 	return BUFFER_OK;
 }

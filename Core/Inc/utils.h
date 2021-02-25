@@ -18,7 +18,7 @@ typedef struct {
     int count;
 } Files;
 
-#define AUDIO_CircularBuffer_SLOTS 8
+#define AUDIO_CircularBuffer_SLOTS 50
 typedef struct {
 	uint8_t frame[192];
 	uint8_t len;
@@ -44,7 +44,7 @@ void FindFlacFiles(const char *path, Files *files);
 BUFFER_RESULT initBuffer();
 BUFFER_RESULT getBuffer(_AUDIO_FRAME volatile **ptr);
 BUFFER_RESULT flagDataAsRead();
-BUFFER_RESULT putBuffer(uint16_t *pcmSamples, uint8_t len);
+BUFFER_RESULT putBuffer(uint16_t *pcmSamples, uint8_t len, uint8_t bytesPerSample);
 uint16_t getOccupiedSlotsInBuffer();
 uint16_t getFreeSlotsInBuffer();
 

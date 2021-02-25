@@ -89,7 +89,7 @@ void StartTaskFS(void *argument) {
 
 	current_file_index = 0;
 //	flac_play_song(GetCurrentFilePath());
-	initBuffer(0, 0);
+	initBuffer();
 
 	FRESULT res = f_open(&fil, GetCurrentFilePath(), FA_READ);
 	if (res == FR_OK) {
@@ -102,10 +102,10 @@ void StartTaskFS(void *argument) {
 			xprintf("starting PCM decoding\n");
 			//	start = xTaskGetTickCount();
 			while (run) {
-				uint8_t availableInt16RoomInBuffer = getFreeSlotsInBuffer();
+				uint8_t slots_to_be_filled = getFreeSlotsInBuffer();
 
-				if (availableInt16RoomInBuffer > 0) {
-					xprintf("Slots free: %d\n", availableInt16RoomInBuffer)
+				if (slots_to_be_filled > 1) {
+					//xprintf("Slots free: %d\n", slots_to_be_filled)
 					;
 
 					FLAC_PCM_STATUS res = drFlac_updatePCMBatch();
