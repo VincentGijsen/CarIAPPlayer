@@ -18,7 +18,7 @@ typedef struct {
     int count;
 } Files;
 
-#define AUDIO_CircularBuffer_SLOTS 50
+#define AUDIO_CircularBuffer_SLOTS 20
 typedef struct {
 	uint8_t frame[192];
 	uint8_t len;
@@ -30,7 +30,7 @@ typedef struct {
 	uint8_t volatile pRead;
 	uint8_t volatile slots;
 	_AUDIO_FRAME volatile data[AUDIO_CircularBuffer_SLOTS];
-	uint8_t Isinitialized;
+	uint8_t volatile Isinitialized;
 }AUDIO_CircularBuffer_t;
 
 typedef enum{

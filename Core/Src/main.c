@@ -101,7 +101,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 
-  StartTaskFS(1);
+  //FLAC implementation
+  //StartTaskFS(1);
+
+
+  //Wave implementation
+WavInit();
+
+WavPlayBlocking();
 
 
   /* USER CODE END 2 */

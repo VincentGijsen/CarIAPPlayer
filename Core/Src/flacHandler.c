@@ -5,9 +5,7 @@
 #include "xprintf.h"
 
 #include "flacHandler.h"
-/*protos internal */
 
-//void _setupDr_flac//();
 /*
  * DRflac settings
  */
@@ -101,11 +99,8 @@ void _drflac_onMeta(void *pUserData, drflac_metadata *pMetadata) {
 			memcpy(&temp, s, pCommentLengthOut);
 			//add string terminator to final 'store'
 			temp[pCommentLengthOut - 1] = '\0';
-			//memccpy()
-			xprintf("meta: %s\n", temp);
 
-			//	uint8_t offset = 0, valueLength = 0;
-			//	uint8_t dummy = 0;
+			xprintf("meta: %s\n", temp);
 
 #define ALBUM_STR_VAL "ALBUM="
 #define ALBUM_STR_LEN sizeof(ALBUM_STR_VAL) -1 //don't include \0
@@ -223,9 +218,6 @@ FLAC_HANDLER_STATUS drFlac_play(FIL *file) {
 
 //TODO: implemeent stop/clear check before start
 
-//setup 'fresh' decoder'
-//drflac_opecurn_memory_with_metadata(pData, dataSize, drFlacMetaCallBack, &myData, &allocationCallbacks);
-
 	myData.pFlac = drflac_open_with_metadata_relaxed(_drflac_onRead,
 			_drflac_onSeek, _drflac_onMeta, drflac_container_native, &myData,
 			&allocationCallbacks);
@@ -237,38 +229,27 @@ FLAC_HANDLER_STATUS drFlac_play(FIL *file) {
 	}
 	return FLAC_DECODER_ERROR;
 
-//ask for 192 frames ==1ms
-
-//drflac_int32* pSamples = pvPortMalloc((pFlac->totalPCMFrameCount * pFlac->channels * sizeof(drflac_int32));
-
-//while (drflac_read_pcm_frames_s32(pFlac, chunkSizeInPCMFrames,
-//		pChunkSamples) > 0) {
-//	do_something();
-
-//    drflac_open_memory_and_read_pcm_frames_s16()
-// drflac_open_with_metadata()
-// drflac_open_memory_and_read_pcm_frames_s16()
 }
 
 FLAC_PCM_STATUS drFlac_updatePCMBatch() {
 
 	switch (songStreamProperties.freq) {
 	case FLAC_HZ_44100:
-		myData.framesToRead = FLAC_SAMPLES_MS_44100_16BIT;
+		myData.framesToRead = USB_SAMPLES_AT_44100RATE_A_MS;
 		myData.aditional_frames_on_interval =
-		FLAC_SAMPLES_MS_44100_16BIT_EXTRA_EACH_FRAMES;
+		USB_SAMPLES_AT_44100RATE_EXTRA_SAMPLE_INTERVAL;
 		myData.interval_for_extra_frames =
-		FLAC_SAMPLES_MS_44100_16BIT_EXTRA_EACH_FRAMES_TO_INSERT;
-		myData.bytes_per_sample = FLAC_SAMPLES_MS_44100_16BIT_BYTES_PER_SAMPLE;
+		USB_SAMPLES_AT_44100RATE_EXTRA_TO_INCLUDE;
+		myData.bytes_per_sample = USB_SAMPLES_AT_44100_AT_16SINT_OF_BYTES;
 		break;
 
 	case FLAC_HZ_48000:
-		myData.framesToRead = FLAC_SAMPLES_MS_48000_16BIT;
+		myData.framesToRead = USB_SAMPLES_AT_48000RATE_A_MS;
 		myData.aditional_frames_on_interval =
-		FLAC_SAMPLES_MS_48000_16BIT_EXTRA_EACH_FRAMES;
+		USB_SAMPLES_AT_48000RATE_EXTRA_SAMPLE_INTERVAL;
 		myData.interval_for_extra_frames =
-		FLAC_SAMPLES_MS_48000_16BIT_EXTRA_EACH_FRAMES_TO_INSERT;
-		myData.bytes_per_sample = FLAC_SAMPLES_MS_48000_16BIT_BYTES_PER_SAMPLE;
+		USB_SAMPLES_AT_48000RATE_EXTRA_TO_INCLUDE;
+		myData.bytes_per_sample = USB_SAMPLES_AT_48000_AT_16SINT_OF_BYTES;
 		break;
 
 	default:

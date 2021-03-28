@@ -68,7 +68,8 @@
 
 _AUDIO_FRAME volatile *_usb_audio_frame = 0;
 volatile uint32_t PlayFlag = 0;
-
+volatile uint8_t usbSyncToggle = 0;
+volatile uint8_t epnum_l=0;
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
  * @{
  */
@@ -271,7 +272,7 @@ AUDIO_SAMPLE_FREQ(USBD_AUDIO_FREQ), /* Audio sampling frequency coded on 3 bytes
 AUDIO_STANDARD_ENDPOINT_DESC_SIZE, /* bLength */
 USB_DESC_TYPE_ENDPOINT, /* bDescriptorType */
 AUDIO_IN_EP, /* bEndpointAddress 1 out endpoint */
-USBD_EP_TYPE_ISOC, /* bmAttributes */
+USBD_EP_TYPE_ISOC | 0x04, /* bmAttributes */ //and async=0x04
 AUDIO_PACKET_SZE(USBD_AUDIO_FREQ), /* wMaxPacketSize in Bytes (Freq(Samples)*2(Stereo)*2(HalfWord)) */
 AUDIO_FS_BINTERVAL, /* bInterval */
 0x00, /* bRefresh */
@@ -509,6 +510,8 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	//UNUSED(pdev);
 	//UNUSED(epnum);
 
+ epnum_l = epnum;
+
 	USBD_LL_FlushEP(pdev, AUDIO_IN_EP);
 	//if (buffer_ready == 1) {
 	if(BUFFER_ERROR == flagDataAsRead())
@@ -516,10 +519,21 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 		//xprintf("buff-empty\n");
 		return (uint8_t) USBD_OK;
 	}
+
+
 	getBuffer(&_usb_audio_frame);
 
 	if(_usb_audio_frame){
 		USBD_LL_Transmit(pdev, AUDIO_IN_EP, _usb_audio_frame->frame, _usb_audio_frame->len); //length in words to bytes
+
+
+		if(usbSyncToggle){
+					usbSyncToggle=0;
+				}else{
+					usbSyncToggle=1;
+				}
+
+
 	}
 
 // else {
