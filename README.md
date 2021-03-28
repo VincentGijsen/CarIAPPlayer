@@ -22,5 +22,6 @@ higly inspired by initiatives like / borrowed code from:
 * https://github.com/oandrew/ipod-gadget
 * https://github.com/dragonman225/stm32f469-usbaudio/
 * https://github.com/Sid346/WAV-Player
+* https://mackron.github.io/dr_flac.html
 
 pleanty more..
