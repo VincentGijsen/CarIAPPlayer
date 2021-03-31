@@ -137,15 +137,15 @@ static void AUDIO_REQ_SetCurrent(USBD_HandleTypeDef *pdev,
 		USBD_SetupReqTypedef *req);
 
 // correct hid descriptor  for usb full speed
-__ALIGN_BEGIN static unsigned char ipod_hid_report[] __ALIGN_END = { 0x06, 0x00,
-		0xff, 0x09, 0x01, 0xa1, 0x01, 0x75, 0x08, 0x26, 0x80, 0x00, 0x15, 0x00,
-		0x09, 0x01, 0x85, 0x01, 0x95, 0x0c, 0x82, 0x02, 0x01, 0x09, 0x01, 0x85,
-		0x02, 0x95, 0x0e, 0x82, 0x02, 0x01, 0x09, 0x01, 0x85, 0x03, 0x95, 0x14,
-		0x82, 0x02, 0x01, 0x09, 0x01, 0x85, 0x04, 0x95, 0x3f, 0x82, 0x02, 0x01,
-		0x09, 0x01, 0x85, 0x05, 0x95, 0x08, 0x92, 0x02, 0x01, 0x09, 0x01, 0x85,
-		0x06, 0x95, 0x0a, 0x92, 0x02, 0x01, 0x09, 0x01, 0x85, 0x07, 0x95, 0x0e,
-		0x92, 0x02, 0x01, 0x09, 0x01, 0x85, 0x08, 0x95, 0x14, 0x92, 0x02, 0x01,
-		0x09, 0x01, 0x85, 0x09, 0x95, 0x3f, 0x92, 0x02, 0x01, 0xc0 };
+__ALIGN_BEGIN static unsigned char ipod_hid_report[96] __ALIGN_END = { 0x06,
+		0x00, 0xff, 0x09, 0x01, 0xa1, 0x01, 0x75, 0x08, 0x26, 0x80, 0x00, 0x15,
+		0x00, 0x09, 0x01, 0x85, 0x01, 0x95, 0x0c, 0x82, 0x02, 0x01, 0x09, 0x01,
+		0x85, 0x02, 0x95, 0x0e, 0x82, 0x02, 0x01, 0x09, 0x01, 0x85, 0x03, 0x95,
+		0x14, 0x82, 0x02, 0x01, 0x09, 0x01, 0x85, 0x04, 0x95, 0x3f, 0x82, 0x02,
+		0x01, 0x09, 0x01, 0x85, 0x05, 0x95, 0x08, 0x92, 0x02, 0x01, 0x09, 0x01,
+		0x85, 0x06, 0x95, 0x0a, 0x92, 0x02, 0x01, 0x09, 0x01, 0x85, 0x07, 0x95,
+		0x0e, 0x92, 0x02, 0x01, 0x09, 0x01, 0x85, 0x08, 0x95, 0x14, 0x92, 0x02,
+		0x01, 0x09, 0x01, 0x85, 0x09, 0x95, 0x3f, 0x92, 0x02, 0x01, 0xc0 };
 
 /**
  * @}
@@ -440,11 +440,9 @@ static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 	pdev->ep_out[AUDIO_IN_EP & 0xFU].is_used = 0U;
 	pdev->ep_out[AUDIO_IN_EP & 0xFU].bInterval = 0U;
 
-
 	(void) USBD_LL_CloseEP(pdev, HID_EPIN_ADDR);
 	pdev->ep_out[HID_EPIN_ADDR & 0xFU].is_used = 0U;
 	pdev->ep_out[HID_EPIN_ADDR & 0xFU].bInterval = 0U;
-
 
 	/* DeInit  physical Interface components */
 	if (pdev->pClassData != NULL) {
@@ -491,123 +489,140 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 	 #define HID_REQ_GET_REPORT            0x01
 	 */
 
-	case USB_REQ_TYPE_CLASS:
-		switch (req->bRequest) {
-		//case HID_REQ_SET_PROTOCOL:
+	;
+case USB_REQ_TYPE_CLASS:
+	switch (req->bRequest) {
+	//case HID_REQ_SET_PROTOCOL:
 
-		case HID_REQ_SET_PROTOCOL:
-			hdevs->hhid.Protocol = (uint8_t) (req->wValue);
-			break;
-
-		case HID_REQ_GET_PROTOCOL:
-			USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.Protocol, 1);
-			break;
-
-		case HID_REQ_SET_IDLE:
-			hdevs->hhid.IdleState = (uint8_t) (req->wValue >> 8);
-			break;
-
-		case HID_REQ_GET_IDLE:
-			USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.IdleState, 1);
-			break;
-
-		case AUDIO_REQ_GET_CUR:
-			AUDIO_REQ_GetCurrent(pdev, req);
-			break;
-
-		case AUDIO_REQ_SET_CUR:
-			AUDIO_REQ_SetCurrent(pdev, req);
-			break;
-
-		default:
-			USBD_CtlError(pdev, req);
-			ret = USBD_FAIL;
-			break;
-		}
+	case HID_REQ_SET_PROTOCOL:
+		hdevs->hhid.Protocol = (uint8_t) (req->wValue);
 		break;
 
-	case USB_REQ_TYPE_STANDARD:
-		switch (req->bRequest) {
-		case USB_REQ_GET_STATUS:
-			if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-				(void) USBD_CtlSendData(pdev, (uint8_t*) &status_info, 2U);
-			} else {
-				USBD_CtlError(pdev, req);
-				ret = USBD_FAIL;
-			}
-			break;
-
-		case USB_REQ_GET_DESCRIPTOR:
-			if ((req->wValue >> 8) == AUDIO_DESCRIPTOR_TYPE) {
-				pbuf = USBD_AUDIO_CfgDesc + 18;
-				len = MIN(USB_AUDIO_DESC_SIZ +(+9+9+7), req->wLength);
-
-				(void) USBD_CtlSendData(pdev, pbuf, len);
-			}
-
-//#define HID_REPORT_DESC               0x22
-
-			if ((req->wValue >> 8) == HID_REPORT_DESC) {
-				len = MIN(sizeof(ipod_hid_report), req->wLength);
-				pbuf = ipod_hid_report;
-				(void) USBD_CtlSendData(pdev, pbuf, len);
-			}
-			/*
-			 #define HID_DESCRIPTOR_TYPE           0x21
-
-			 else if( req->wValue >> 8 == HID_DESCRIPTOR_TYPE)
-			 {
-			 pbuf = USBD_HID_Desc;
-			 len = MIN(USB_HID_DESC_SIZ , req->wLength);
-			 (void) USBD_CtlSendData(pdev, pbuf, len);
-			 }
-			 */
-			break;
-
-		case USB_REQ_GET_INTERFACE:
-			if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-				(void) USBD_CtlSendData(pdev,
-						(uint8_t*) &hdevs->haudio.alt_setting, 1U);
-			} else {
-				USBD_CtlError(pdev, req);
-				ret = USBD_FAIL;
-			}
-			break;
-
-		case USB_REQ_SET_INTERFACE:
-			if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-				if ((uint8_t) (req->wValue) <= USBD_MAX_NUM_INTERFACES) {
-					hdevs->haudio.alt_setting = (uint8_t) (req->wValue);
-
-					if (hdevs->haudio.alt_setting == 1U) {
-						PlayFlag = 1;
-					} else {
-						PlayFlag = 0;
-					}
-				} else {
-					/* Call the error management function (command will be nacked */
-					USBD_CtlError(pdev, req);
-					ret = USBD_FAIL;
-				}
-			} else {
-				USBD_CtlError(pdev, req);
-				ret = USBD_FAIL;
-			}
-			break;
-
-		case USB_REQ_CLEAR_FEATURE:
-			break;
-
-		default:
-			USBD_CtlError(pdev, req);
-			ret = USBD_FAIL;
-			break;
-		}
+	case HID_REQ_GET_PROTOCOL:
+		USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.Protocol, 1);
 		break;
+
+	case HID_REQ_SET_IDLE:
+		hdevs->hhid.IdleState = (uint8_t) (req->wValue >> 8);
+		break;
+
+	case HID_REQ_GET_IDLE:
+		USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.IdleState, 1);
+		break;
+
+	case AUDIO_REQ_GET_CUR:
+		AUDIO_REQ_GetCurrent(pdev, req);
+		break;
+
+	case AUDIO_REQ_SET_CUR:
+		AUDIO_REQ_SetCurrent(pdev, req);
+		break;
+
 	default:
 		USBD_CtlError(pdev, req);
 		ret = USBD_FAIL;
 		break;
+	}
+	break;
+
+case USB_REQ_TYPE_STANDARD:
+	xprintf("USB::USB_REQ_TYPE_STANDARD\n");
+
+	switch (req->bRequest) {
+	case USB_REQ_GET_STATUS:
+		if (pdev->dev_state == USBD_STATE_CONFIGURED) {
+			(void) USBD_CtlSendData(pdev, (uint8_t*) &status_info, 2U);
+		} else {
+			USBD_CtlError(pdev, req);
+			ret = USBD_FAIL;
+		}
+		break;
+
+	case USB_REQ_GET_DESCRIPTOR:
+
+//			#define INTERFACE_AUDIO 0
+//			#define INTERFACE_HID 2
+		xprintf("USB::USB_REQ_GET_DESCRIPTOR %d\n", (req->wIndex & 0xff));
+
+		if ((req->wValue >> 8) == AUDIO_DESCRIPTOR_TYPE) {
+			xprintf("USB::AUDIO_DESCRIPTOR_TYPE\n");
+			//pbuf = USBD_AUDIO_CfgDesc + 18;
+			pbuf = USBD_AUDIO_CfgDesc + 18;
+			len = MIN(USB_AUDIO_DESC_SIZ +(+9+9+7), req->wLength);
+
+			(void) USBD_CtlSendData(pdev, pbuf, len);
+		}
+
+		if ((req->wValue >> 8) == HID_REPORT_DESC) {
+			xprintf("USB::HID_REPORT_DESC\n");
+
+			len = MIN(sizeof(ipod_hid_report), req->wLength);
+			pbuf = ipod_hid_report;
+			(void) USBD_CtlSendData(pdev, pbuf, len);
+		}
+		/*
+		 #define HID_DESCRIPTOR_TYPE           0x21
+
+		 else if( req->wValue >> 8 == HID_DESCRIPTOR_TYPE)
+		 {
+		 pbuf = USBD_HID_Desc;
+		 len = MIN(USB_HID_DESC_SIZ , req->wLength);
+		 (void) USBD_CtlSendData(pdev, pbuf, len);
+		 }
+		 */
+		break;
+
+	case USB_REQ_GET_INTERFACE:
+		xprintf("USB::USB_REQ_GET_INTERFACE\n");
+
+		if (pdev->dev_state == USBD_STATE_CONFIGURED) {
+			(void) USBD_CtlSendData(pdev, (uint8_t*) &hdevs->haudio.alt_setting,
+					1U);
+		} else {
+			USBD_CtlError(pdev, req);
+			ret = USBD_FAIL;
+		}
+		break;
+
+	case USB_REQ_SET_INTERFACE:
+		xprintf("USB::USB_REQ_SET_INTERFACE: %d", (req->wIndex & 0xff));
+		xprintf("\n");
+		if (pdev->dev_state == USBD_STATE_CONFIGURED) {
+			if ((uint8_t) (req->wValue) <= USBD_MAX_NUM_INTERFACES) {
+				hdevs->haudio.alt_setting = (uint8_t) (req->wValue);
+
+				if (hdevs->haudio.alt_setting == 1U) {
+					PlayFlag = 1;
+				} else {
+					PlayFlag = 0;
+				}
+			} else {
+				/* Call the error management function (command will be nacked */
+				USBD_CtlError(pdev, req);
+				ret = USBD_FAIL;
+			}
+		} else {
+			xprintf("USB::USB_REQ_SET_INTERFACE --ERROR--\n ");
+
+			USBD_CtlError(pdev, req);
+			ret = USBD_FAIL;
+		}
+		break;
+
+	case USB_REQ_CLEAR_FEATURE:
+		break;
+
+	default:
+		xprintf("USB::DEFAULT_ERROR\n");
+		USBD_CtlError(pdev, req);
+		ret = USBD_FAIL;
+		break;
+	}
+	break;
+default:
+	USBD_CtlError(pdev, req);
+	ret = USBD_FAIL;
+	break;
 	}
 
 	return (uint8_t) ret;
