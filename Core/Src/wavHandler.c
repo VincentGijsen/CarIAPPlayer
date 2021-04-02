@@ -83,11 +83,12 @@ void WavPlayBlocking() {
 
 	case 16: {
 		if (head.sample_rate == 48000) {
+			xprintf("starting to fill buffer\n");
 			while (run) {
 				uint8_t slots_to_be_filled = getFreeSlotsInBuffer();
 
 				if (slots_to_be_filled > 1) {
-					xprintf("topping op buffer\n");
+					//xprintf("topping op buffer\n");
 					WAV_BUFFER_STATUS res;
 					res = WavUpdateBuffers();
 					if (res != WAV_BUFFER_OK) {
