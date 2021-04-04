@@ -100,6 +100,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  transportInit();
 
   //FLAC implementation
   //StartTaskFS(1);

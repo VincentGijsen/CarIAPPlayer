@@ -508,7 +508,7 @@ static uint8_t USBD_AUDIO_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 	/*
 	 * HIDSTUFS
 	 */
-	USBD_LL_OpenEP(pdev, HID_EPIN_ADDR, USBD_EP_TYPE_INTR, HID_EPIN_SIZE);
+	(void) USBD_LL_OpenEP(pdev, HID_EPIN_ADDR, USBD_EP_TYPE_INTR, 0x40);
 	pdev->ep_out[HID_EPIN_ADDR & 0xFU].is_used = 1U;
 	hdevs->hhid.state = HID_IDLE;
 
@@ -648,7 +648,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 	}
 		break;
 
-	case HID_REQ_SET_IDLE:
+	case HID_REQ_SET_IDLE: /* 0x0a */
 		xprintf("HID_REQ_SET_IDLE\n");
 		hdevs->hhid.IdleState = (uint8_t) (req->wValue >> 8);
 		break;
@@ -827,9 +827,11 @@ uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report,
 
 	if (pdev->dev_state == USBD_STATE_CONFIGURED) {
 		if (hdevs->hhid.state == HID_IDLE) {
-			hdevs->hhid.state = HID_BUSY;
+			//hdevs->hhid.state = HID_BUSY;
 			USBD_LL_Transmit(pdev,
 			HID_EPIN_ADDR, report, len);
+
+			printPackage(report,len, 1 );
 		}
 	}
 	return USBD_OK;
@@ -909,6 +911,21 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	return (uint8_t) USBD_OK;
 }
 
+void printPackage(uint8_t *pkg, uint8_t len, uint8_t dir) {
+
+	if(dir == 0){
+		 xprintf("IN ");
+	}else{
+		xprintf("OUT ");
+	}
+
+	xprintf("PKG ");
+	for (uint8_t x = 0; x < len; x++) {
+		xprintf("%X ", pkg[x]);
+	}
+	xprintf("\n");
+}
+
 /**
  * @brief  USBD_AUDIO_EP0_RxReady
  *         handle EP0 Rx Ready event
@@ -924,12 +941,7 @@ static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 	//xprintf("USBD_AUDIO_EP0_RxReady()\n");
 	//for (uint8_t x =0; x<haudio->control.len)
 	if (hdevs->haudio.control.cmd == AUDIO_REQ_SET_CUR) {
-		xprintf("PACKET ->: ");
-		for (uint8_t x =0; x<hdevs->haudio.control.len;x++){
-			xprintf("%X ", hdevs->haudio.control.data[x]);
-		}
-		xprintf("\n");
-
+		printPackage(hdevs->haudio.control.data,hdevs->haudio.control.len, 0 );
 		processInbound(hdevs->haudio.control.data, hdevs->haudio.control.len);
 		/* byte 0 = report-id
 		 * byte 1 = link control byte at start?
