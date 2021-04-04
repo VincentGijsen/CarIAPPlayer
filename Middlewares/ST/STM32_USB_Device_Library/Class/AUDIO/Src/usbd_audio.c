@@ -66,6 +66,9 @@
 #include "usbd_hid.h"
 #include "utils.h"
 
+#include "transactionlayer.h"
+
+
 _AUDIO_FRAME volatile *_usb_audio_frame = 0;
 volatile uint32_t PlayFlag = 0;
 volatile uint8_t usbSyncToggle = 0;
@@ -553,7 +556,7 @@ static uint8_t USBD_AUDIO_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
  */
 static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		USBD_SetupReqTypedef *req) {
-	xprintf("USB_AUDIO_SETUP()\n");
+	//xprintf("USB_AUDIO_SETUP()\n");
 	USBD_DEVS_HandleTypeDef *hdevs;
 
 	uint16_t len;
@@ -584,18 +587,36 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		switch (req->bRequest) {
 		//case HID_REQ_SET_PROTOCOL:
 		xprintf("USB_REQ_TYPE_CLASS \n");
-
-	case AUDIO_REQ_GET_CUR:
-		AUDIO_REQ_GetCurrent(pdev, req);
-		break;
-
-	case AUDIO_REQ_SET_CUR: /*clear feature*/
+		/*
+		 case AUDIO_REQ_GET_CUR:
+		 AUDIO_REQ_GetCurrent(pdev, req);
+		 break;
+		 */
+//	case AUDIO_REQ_SET_CUR: /* 0b10100001 -> https://www.usb.org/sites/default/files/audio10.pdf p66)
 		/* NOT USED BY hid */
-		AUDIO_REQ_SetCurrent(pdev, req);
+		//	AUDIO_REQ_SetCurrent(pdev, req);
+		//	break;
+		/* HID STUFFS */
+
+	case HID_REQ_GET_REPORT: /* 0x01 mandatory */{
+		xprintf("HID_REQ_GET_REPORT\n");
+
+		uint8_t hid_report_type = (req->wValue >> 8);
+		uint8_t hid_report_id = (req->wValue & 0xff);
+		uint8_t req_interface = (req->wIndex & 0xff);
+		uint8_t hid_report_len = req->wLength;
+		uint8_t *dummy = malloc(hid_report_len);
+		if(dummy){
+			memset(dummy, 0x00,hid_report_len);
+			USBD_CtlSendData(pdev, dummy, hid_report_len);
+			free(dummy);
+		}
+	}
 		break;
-	case HID_REQ_SET_PROTOCOL:
-		xprintf("HID_REQ_SET_PROTCOL\n");
-		hdevs->hhid.Protocol = (uint8_t) (req->wValue);
+
+	case HID_REQ_GET_IDLE:
+		xprintf("HID_REQ_GET_IDLE\n");
+		USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.IdleState, 1);
 		break;
 
 	case HID_REQ_GET_PROTOCOL:
@@ -603,14 +624,38 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.Protocol, 1);
 		break;
 
+		/* 0x04 - 0x08 are RESERVED: https://www.usb.org/sites/default/files/hid1_11.pdf p61 */
+
+	case HID_REQ_SET_REPORT:
+	{
+
+
+		uint8_t hid_report_type = (req->wValue >> 8);
+		uint8_t hid_report_id = (req->wValue & 0xff);
+		uint8_t req_interface = (req->wIndex & 0xff);
+		uint8_t hid_report_len = req->wLength;
+		//xprintf("HID_REQ_SET_REPORT T:%d, ID:%d, INT:%d, LEN:%d\n", hid_report_type, hid_report_id, req_interface, hid_report_len);
+
+		if (hid_report_len != 0U) {
+				/* Prepare the reception of the buffer over EP0 */
+				(void) USBD_CtlPrepareRx(pdev, hdevs->haudio.control.data,
+						req->wLength);
+
+				hdevs->haudio.control.cmd = AUDIO_REQ_SET_CUR; /* Set the request value */
+				hdevs->haudio.control.len = (uint8_t) req->wLength; /* Set the request data length */
+				hdevs->haudio.control.unit = HIBYTE(req->wIndex); /* Set the request target unit */
+		}
+	}
+		break;
+
 	case HID_REQ_SET_IDLE:
 		xprintf("HID_REQ_SET_IDLE\n");
 		hdevs->hhid.IdleState = (uint8_t) (req->wValue >> 8);
 		break;
 
-	case HID_REQ_GET_IDLE:
-		xprintf("HID_REQ_GET_IDLE\n");
-		USBD_CtlSendData(pdev, (uint8_t*) &hdevs->hhid.IdleState, 1);
+	case HID_REQ_SET_PROTOCOL: /*0x0B*/
+		xprintf("HID_REQ_SET_PROTCOL\n");
+		hdevs->hhid.Protocol = (uint8_t) (req->wValue);
 		break;
 
 	default:
@@ -638,48 +683,75 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 			}
 			break;
 
+		case USB_REQ_CLEAR_FEATURE: /* 0x01 */
+		case USB_REQ_SET_FEATURE: /* 0x03 */
+		case USB_REQ_SET_ADDRESS: /* 0x05 */
+			break;
+
 		case USB_REQ_GET_DESCRIPTOR: /* 0x06 */
+		{
 			/* https://www.beyondlogic.org/usbnutshell/usb6.shtml */
 			xprintf("USB::USB_REQ_GET_DESCRIPTOR type: %d, idx: %d\n",
 					(req->wIndex & 0xff), (req->wIndex & 0x00ff));
+			uint8_t descriptor_type = (req->wValue >> 8);
+			uint8_t descriptor_idx = (req->wValue & 0xff);
 
-			if ((req->wValue >> 8) == HID_REPORT_DESC) {
-				pbuf = ipod_hid_report;
-				len = MIN(96, req->wLength);
-			} else if (req->wValue >> 8 == HID_DESCRIPTOR_TYPE) {
+			switch (descriptor_type) {
+			case USB_DESC_TYPE_DEVICE:
+
+				break;
+
+			case USB_DESC_TYPE_CONFIGURATION:
+				//check descriptor idx
+
+				break;
+			case USB_DESC_TYPE_INTERFACE:
+
+				break;
+
+			case 0x21: /* HID https://www.usb.org/sites/default/files/hid1_11.pdf p59*/
+				xprintf("HID descriptor reqested \n");
+				uint8_t hid_idx = (req->wIndex);
 				len = MIN(9, req->wLength);
 				pbuf = USBD_HID_Desk;
+				break;
+
+			case 0x22: /* REPORT */
+				xprintf("HID report reqested \n");
+				len = MIN(96, req->wLength);
+				pbuf = ipod_hid_report;
+				break;
+
+			case 0x23: /* physical descriptor */
+
+			default:
+//error
+				USBD_CtlError(pdev, req);
+				ret = USBD_FAIL;
+				break;
 			}
-			/*
-			 *
-			 if ((req->wValue >> 8) == AUDIO_DESCRIPTOR_TYPE) {
-			 xprintf("USB::AUDIO_DESCRIPTOR_TYPE\n");
-			 pbuf = USBD_AUDIO_CfgDesc + 18 + (9) + (9 + 9 + 7);
-			 len = MIN(USB_AUDIO_DESC_SIZ, req->wLength);
-
-			 } else if ((req->wValue >> 8) == HID_REPORT_DESC) {
-			 xprintf("USB::HID_REPORT_DESC\n");
-			 */
-
-			/*
-			 }
-			 */
+			//send actual response
 			(void) USBD_CtlSendData(pdev, pbuf, len);
+
+		}
 			break;
 
-		case USB_REQ_GET_CONFIGURATION:
+		case USB_REQ_SET_DESCRIPTOR: /*0x07 */
+			break;
+
+		case USB_REQ_GET_CONFIGURATION: /* 0x08 */
 			xprintf("USB::USB_REQ_GET_CONFIGURATION\n");
 			//todo
 			break;
 
-		case USB_REQ_SET_CONFIGURATION:
+		case USB_REQ_SET_CONFIGURATION: /* 0x09*/
 			xprintf("USB::USB_REQ_SET_CONFIGURATION: %d\n",
 					(uint8_t) ((req->wValue) & 0xff));
 
 			//todo
 			break;
 
-		case USB_REQ_GET_INTERFACE:
+		case USB_REQ_GET_INTERFACE: /* 0x0A */
 			xprintf("USB::USB_REQ_GET_INTERFACE: widx: %d\n",
 					req->wIndex & 0xff);
 
@@ -692,7 +764,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 			}
 			break;
 
-		case USB_REQ_SET_INTERFACE:
+		case USB_REQ_SET_INTERFACE: /* 0x0B */
 			xprintf("USB::USB_REQ_SET_INTERFACE: %d", (req->wIndex & 0xff));
 			xprintf("\n");
 			if (pdev->dev_state == USBD_STATE_CONFIGURED) {
@@ -722,6 +794,9 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 				USBD_CtlError(pdev, req);
 				ret = USBD_FAIL;
 			}
+			break;
+
+		case USB_REQ_SYNCH_FRAME:
 			break;
 
 		default:
@@ -841,20 +916,35 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
  * @retval status
  */
 static uint8_t USBD_AUDIO_EP0_RxReady(USBD_HandleTypeDef *pdev) {
-	USBD_AUDIO_HandleTypeDef *haudio;
-	haudio = (USBD_AUDIO_HandleTypeDef*) pdev->pClassData;
+	//USBD_AUDIO_HandleTypeDef *haudio;
+	//haudio = (USBD_AUDIO_HandleTypeDef*) pdev->pClassData;
+	USBD_DEVS_HandleTypeDef *hdevs;
+	hdevs = (USBD_DEVS_HandleTypeDef*) pdev->pClassData;
 
-	xprintf("USBD_AUDIO_EP0_RxReady()\n");
-	if (haudio->control.cmd == AUDIO_REQ_SET_CUR) {
+	//xprintf("USBD_AUDIO_EP0_RxReady()\n");
+	//for (uint8_t x =0; x<haudio->control.len)
+	if (hdevs->haudio.control.cmd == AUDIO_REQ_SET_CUR) {
+		xprintf("PACKET ->: ");
+		for (uint8_t x =0; x<hdevs->haudio.control.len;x++){
+			xprintf("%X ", hdevs->haudio.control.data[x]);
+		}
+		xprintf("\n");
+
+		processInbound(hdevs->haudio.control.data, hdevs->haudio.control.len);
+		/* byte 0 = report-id
+		 * byte 1 = link control byte at start?
+		 * byte 2 = payload eg 0x85
+		 */
+
 		/* In this driver, to simplify code, only SET_CUR request is managed */
 
-		if (haudio->control.unit == AUDIO_OUT_STREAMING_CTRL) {
-			((USBD_AUDIO_ItfTypeDef*) pdev->pUserData)->MuteCtl(
-					haudio->control.data[0]);
-			haudio->control.cmd = 0U;
-			haudio->control.len = 0U;
+		if (hdevs->haudio.control.unit == AUDIO_OUT_STREAMING_CTRL) {
+			//((USBD_AUDIO_ItfTypeDef*) pdev->pUserData)->MuteCtl(haudio->control.data[0]);
+			hdevs->haudio.control.cmd = 0U;
+			hdevs->haudio.control.len = 0U;
 		}
 	}
+
 
 	return (uint8_t) USBD_OK;
 }
@@ -1054,6 +1144,8 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef *pdev,
  * @param  pdev: instance
  * @param  req: setup class request
  * @retval status
+ *
+ * Class AUDIO specific?
  */
 static void AUDIO_REQ_SetCurrent(USBD_HandleTypeDef *pdev,
 		USBD_SetupReqTypedef *req) {

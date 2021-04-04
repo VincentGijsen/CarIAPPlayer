@@ -108,7 +108,7 @@ int main(void)
   //Wave implementation
 WavInit();
 
-WavPlayBlocking();
+//WavPlayBlocking();
 
 
   /* USER CODE END 2 */
@@ -117,6 +117,7 @@ WavPlayBlocking();
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  processTransport();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
