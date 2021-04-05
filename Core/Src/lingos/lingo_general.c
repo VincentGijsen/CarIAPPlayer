@@ -54,24 +54,71 @@ void processLingoGeneral(IAPmsg msg) {
 			uint8_t tFidSubType = msg.raw[tokenStartIdx + 2];
 			uint8_t tdataStart = msg.raw[tokenStartIdx + 3];
 
-			//prep for next token
-			tokenStartIdx += (tLeng + 1);
+
 
 			if (tFidType == 0x00) {
 				if (tFidSubType == 0x00) {
 					xprintf("IdentityToken : ");
+
 				} else if (tFidSubType == 0x01) {
-					xprintf("AccessoryCapsToken: ");
+					xprintf("AccessoryCapsToken:\n");
+
+					for (uint8_t x = 0; x < 8; x++) {
+						xprintf("cap b%d: %b \n",
+								msg.raw[tokenStartIdx + 3 + x]);
+					}
+
 				} else if (tFidSubType == 0x02) {
+
 					xprintf("AccessoryInfoToken: ");
+
+					if (tdataStart == 0x01) {
+						xprintf("name: ");
+						uint8_t idx = 1;
+						while (idx) {
+							char c = msg.raw[tokenStartIdx + 3 + idx];
+							xprintf("%c", c);
+							if (c == '\0')
+								break;
+							idx++;
+						}
+
+					}
+					if (tdataStart == 0x04) {
+						xprintf("FW: %x %x %x ", msg.raw[tokenStartIdx + 3 + 1],
+								msg.raw[tokenStartIdx + 3 + 2],
+								msg.raw[tokenStartIdx + 3 + 3]);
+					}
+					if (tdataStart == 0x06) {
+						xprintf("Manufact: ");
+						uint8_t idx = 1;
+						while (idx) {
+							char c = msg.raw[tokenStartIdx + 3 + idx];
+							xprintf("%c", c);
+							if (c == '\0')
+								break;
+							idx++;
+						}
+
+					}
+
+				} else if (tFidSubType == 0x03) {
+					xprintf("iPodPreferenceToken: ");
+				} else if (tFidSubType == 0x04) {
+					xprintf("EAProtocolToken: ");
+				} else {
+					xprintf("Other Token: ");
 				}
 				if (tFidType == 0x00 && tFidSubType == 0x0e) {
 					xprintf("AccessoryDigital-AudioSampleRates-Token\n");
 				}
 
 			}
-			xprintf("len: %X, type: %X, subType: %x \n", tLeng, tFidType,
+			xprintf("len: %d, type: %X, subType: %x \n", tLeng, tFidType,
 					tFidSubType);
+
+			//prep for next token
+						tokenStartIdx += (tLeng + 1);
 		}
 
 		//send acced tokens: AckFIDTokenValues
@@ -121,8 +168,7 @@ void processLingoGeneral(IAPmsg msg) {
 				pkg_len /*3*/,
 				LingoGeneral/*4*/, RetiPodOptionsForLingoCmd/*5*/,
 				GEN_TRANSACTIONBYTES(msg.transID)/* 6-7 */,
-				reqestedLingoOpts /*8*/,
-				caps /*9-16*/, 0 /* 17 chk*/, 0, 0,0 };
+				reqestedLingoOpts /*8*/, caps /*9-16*/, 0 /* 17 chk*/, 0, 0, 0 };
 
 		report[17] = calcCRC(&report[3], pkg_len + 1);
 		USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
