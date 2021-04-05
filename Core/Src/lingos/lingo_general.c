@@ -16,6 +16,8 @@ typedef enum {
 
 typeDefTransportStatus lingoGeneral_state = UNDEF;
 
+#define LingoGeneral 0x00
+
 void processLingoGeneral(IAPmsg msg) {
 
 	switch (msg.commandId) {
@@ -30,8 +32,9 @@ void processLingoGeneral(IAPmsg msg) {
 		uint8_t cmdstatus = 0x00; //success
 		uint8_t origCmdID = 0x38; //origCmdID?
 
-		uint8_t report[13] = { 0x01, 0x0, 0x55, pkg_len, lingo, cmd, 0x00, 0x01,
-				cmdstatus, origCmdID, 0x00 /*checksum spot */, 0, 0 };
+		uint8_t report[13] = { 0x01, 0x0, START_OF_FRAME, pkg_len, lingo, cmd,
+				GEN_TRANSACTIONBYTES(msg.transID), cmdstatus, origCmdID,
+				0x00 /*checksum spot */, 0, 0 };
 		//addchecksum byes
 		report[10] = calcCRC(&report[3], pkg_len + 1);
 
@@ -88,8 +91,9 @@ void processLingoGeneral(IAPmsg msg) {
 		uint8_t maxHi = 0x00; //success
 		uint8_t maxLo = 0x36; //origCmdID?
 
-		uint8_t report[] = { 0x03, 0x0, 0x55, pkg_len, lingo, cmd, 0x00, 0x01,
-				maxHi, maxLo, 0x00 /*checksum spot */, 0, 0 };
+		uint8_t report[] = { 0x03, 0x0, START_OF_FRAME, pkg_len, lingo, cmd,
+				GEN_TRANSACTIONBYTES(msg.transID), maxHi, maxLo,
+				0x00 /*checksum spot */, 0, 0 };
 		//addchecksum byes
 		report[10] = calcCRC(&report[3], pkg_len + 1);
 
@@ -98,48 +102,37 @@ void processLingoGeneral(IAPmsg msg) {
 		break;
 
 	case 0x4b: //GetiPodOptionsForLingo:
-	{ //return RetiPodOptionsForLingo 0x4C
-	  //options are requested for:
+	{
+		//GetiPodOptionsForLingo
+		const uint8_t RetiPodOptionsForLingoCmd = 0x4c;
 		uint8_t reqestedLingoOpts = msg.raw[8];
+		uint8_t pkg_len = 14;
+		uint8_t caps[8] = { 0 };
 
-		uint64_t features;
-		if (reqestedLingoOpts == 0) {
-			features = (1 << 23);
+		switch (reqestedLingoOpts) {
+		case 0x00: //lingo 0
+		{
 
-			//see RetiPodOptionsForLingo p192
-		} else if (reqestedLingoOpts == 0x2) {
-			//simple remote
-			features = (1 << 01); //audio media control
-		} else if (reqestedLingoOpts == 0x3) {
-			//display_remote
-			features = 0;
-
-		} else if (reqestedLingoOpts == 0x04) {
-			//extended control
-			features = (1 << 06); //enable play control in extended?
-		} else if (reqestedLingoOpts == 0x0a) {
-			//Digital Audio funct
-			features = (1 << 02); //supports SampleRate reporting via  FID token
-		} else {
-			xprintf("inimplemented request for RetiPodOptionsForLingo %x \n",
-					reqestedLingoOpts);
-			;
+		}
+			break;
 		}
 
-		uint8_t pkg_len = 13;
-		uint8_t report[20] = { 0x01, 0x0, 0x55, pkg_len, msg.lingoID, 0x4c,
-				0x00, 0x01, reqestedLingoOpts, (features >> (8 * 7)) & 0xff,
-				(features >> (8 * 6)) & 0xff, (features >> (8 * 5)) & 0xff,
-				(features >> (8 * 4)) & 0xff, (features >> (8 * 3)) & 0xff,
-				(features >> (8 * 2)) & 0xff, (features >> (8 * 1)) & 0xff,
-				(features >> (8 * 0)) & 0xff, 0x00 /*checksum spot */, 0, 0 };
+		uint8_t report[21] = { 0x03 /*0*/, HID_LINKCTRL_DONE, START_OF_FRAME,
+				pkg_len /*3*/,
+				LingoGeneral/*4*/, RetiPodOptionsForLingoCmd/*5*/,
+				GEN_TRANSACTIONBYTES(msg.transID)/* 6-7 */,
+				reqestedLingoOpts /*8*/,
+				caps /*9-16*/, 0 /* 17 chk*/, 0, 0,0 };
 
-		report[18] = calcCRC(&report[3], pkg_len + 1);
+		report[17] = calcCRC(&report[3], pkg_len + 1);
 		USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
+		return;
+
 	}
 		break;
 
-	case 0x3b: //EndIDPS
+	case 0x3b:
+		//EndIDPS
 	{
 		uint8_t accEndIDPSStatus = msg.raw[8];
 		switch (accEndIDPSStatus) {

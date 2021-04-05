@@ -914,14 +914,14 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 void printPackage(uint8_t *pkg, uint8_t len, uint8_t dir) {
 
 	if(dir == 0){
-		 xprintf("IN ");
+		 xprintf("ACC ");
 	}else{
-		xprintf("OUT ");
+		xprintf("POD ");
 	}
 
 	xprintf("PKG ");
 	for (uint8_t x = 0; x < len; x++) {
-		xprintf("%X ", pkg[x]);
+		xprintf("%02X ", pkg[x]);
 	}
 	xprintf("\n");
 }

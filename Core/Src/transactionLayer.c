@@ -74,15 +74,11 @@ void transportInit() {
 	store.set[3] = 0;
 }
 
-
-#define COMPLETE_PKG 0x00
-#define EXTENDED_PKG 0x02
-#define END_OF_PREVIOUS_TRANSFER 0x01
-
 void processInbound(uint8_t *pkg, uint8_t len) {
 	uint8_t offset = 0;
 	uint8_t idx_payload = 0;
 	uint16_t length = 0;
+	uint8_t remaining_copy_bytes;
 	uint8_t lingoID = 0;
 
 	uint16_t commandID = 0;
@@ -96,27 +92,37 @@ void processInbound(uint8_t *pkg, uint8_t len) {
 		return;
 	}
 	//check preamble
-	if (!(pkg[CMD_PKG_PREAMBLE0] == COMPLETE_PKG || pkg[CMD_PKG_PREAMBLE0] == EXTENDED_PKG
-			|| pkg[CMD_PKG_PREAMBLE0] == END_OF_PREVIOUS_TRANSFER)) {
+	if (!(pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_DONE
+			|| pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_CONTINUE
+			|| pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_MORE_TO_FOLLOW
+			|| pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_ONLY_DATA)) {
 		//invalid pkg
 		xprintf("invalid package start\n");
 		return;
 
 	}
 
-
-
-	if (pkg[CMD_PKG_PREAMBLE0] == COMPLETE_PKG
-			|| pkg[CMD_PKG_PREAMBLE0] == EXTENDED_PKG) {
+	/*
+	 * this section reads the extended package header
+	 */
+	if (pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_DONE
+			|| pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_MORE_TO_FOLLOW) {
 		//length check
 		if (pkg[CMD_PKG_LEN] == 0x00) {
-			//3byte pkg
+			//3byte pkg length
 			length = pkg[CMD_PKG_LEN + 1] << 8;
 			length += pkg[CMD_PKG_LEN + 2];
-			offset += 3;
+			offset += 2;
+			extraBytes = 3;
+			remaining_copy_bytes = length + offset;
 		} else {
 			length = pkg[CMD_PKG_LEN];
+			offset += 0;
+			extraBytes = 1;
+			remaining_copy_bytes = length + offset;
 		}
+		//add extra bytes [hid +linkbyte +start + first_len_byte
+		remaining_copy_bytes += 4;
 
 		lingoID = pkg[CMD_PKG_LINGO_ID + offset];
 
@@ -127,112 +133,150 @@ void processInbound(uint8_t *pkg, uint8_t len) {
 		transID = (pkg[CMD_PKG_TRANSACTION_ID + offset] << 8);
 		transID += pkg[CMD_PKG_TRANSACTION_ID + 1 + offset];
 
-	} else if (pkg[CMD_PKG_PREAMBLE0] == END_OF_PREVIOUS_TRANSFER) {
-		//END_OF_PREVIOUS_TRANSFER
 		for (uint8_t x = 0; x < 4; x++) {
-			if (store.set[x] == 2) { //2 indicates partial entry already
-				//store.msg[x].len = len;
-				//store.msg[x].lingoID = lingoID;
-				//store.msg[x].commandId = commandID;
-				//store.msg[x].transID = transID;
-				uint8_t startPos = store.msg[x].nextWrite; //nextwRITE FILLED AT PREVIOUS ENTRY
-				for (uint8_t y = 0; y < len; y++) {
-					store.msg[x].raw[startPos + y] = pkg[y + 1];
-					store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
+			if (store.set[x] == EMPTY || store.set[x] == MORE_DATA_PENDING) {
+
+				store.msg[x].len = len;
+				store.msg[x].lingoID = lingoID;
+				store.msg[x].commandId = commandID;
+				store.msg[x].transID = transID;
+				store.msg[x].length = length;
+				store.msg[x].remaining_copy_bytes = remaining_copy_bytes;
+				store.msg[x].nextWrite = 0;
+
+				if (pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_DONE) {
+					//only copy sthufs for a 'small/single pkg'
+					uint8_t it = 0;
+					while (store.msg[x].remaining_copy_bytes > 0) {
+						//for (int y = 0; y < (len); y++) {
+						store.msg[x].raw[it] = pkg[it];
+						store.msg[x].nextWrite++;
+						store.msg[x].remaining_copy_bytes--;
+						it++;
+
+					}
+					//next_write should point to crc (last byte)
+					checksum = pkg[store.msg[x].nextWrite]; //includes any offsets after length idx
+					uint8_t checksum_val = calcCRC(&pkg[CMD_PKG_LEN],
+							(length + extraBytes));
+
+					if (checksum != checksum_val) {
+						xprintf(
+								"checksum Failed: provided: %X  calculated %X \n",
+								checksum, checksum_val);
+						return;
+
+					} else {
+
+						//flag as ready-to-rpocess
+						store.set[x] = READY_TO_PROCESS;
+						return;
+					}
+				} else {
+					//done elsewhere
+					/*
+					 * Process payload of Type 2
+					 * HID_LINKCTRL_MORE_TO_FOLLOW
+					 */
+
+					uint8_t it = 0;
+					while (store.msg[x].remaining_copy_bytes > 0 && it < len) {
+						//for (int y = 0; y < (len); y++) {
+						store.msg[x].raw[it] = pkg[it];
+						store.msg[x].nextWrite++;
+						store.msg[x].remaining_copy_bytes--;
+						it++;
+
+					}
+					store.set[x] = MORE_DATA_PENDING;
+					return;
 				}
-				//finalise pkg
-				store.set[x] = 1;
-				break;
+
 			}
 		}
-	}
-	//payload shizzle
-	//payload
 
-	if (pkg[CMD_PKG_PREAMBLE0] == COMPLETE_PKG) {
+	} else {
+		/*
+		 * Intransit package, so we need to add to a prior one(s)
+		 */
+		if (pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_ONLY_DATA) {
+			//END_OF_PREVIOUS_TRANSFER
+			for (uint8_t x = 0; x < 4; x++) {
+				if (store.set[x] == MORE_DATA_PENDING) { //2 indicates partial entry already
+					uint8_t startPos = store.msg[x].nextWrite; //nextwRITE FILLED AT PREVIOUS ENTRY
+					const uint8_t offsetForHIDIdAndLinkByte = 2;
 
-		checksum = pkg[CMD_PKG_LINGO_ID + length]; //includes any offsets after length idx
+					for (uint8_t y = 0; y < (len - offsetForHIDIdAndLinkByte);
+							y++) { //copy whole frame, minus hid-rep and linkbyte
+						store.msg[x].raw[startPos + y] = pkg[y
+								+ offsetForHIDIdAndLinkByte];
+						store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
+						remaining_copy_bytes--; //decrement total amount of bytes to copy
+					}
+					//don't finalise pkg, more should come
+					store.set[x] = MORE_DATA_PENDING;
+					store.msg[x].remaining_copy_bytes = remaining_copy_bytes;
+					return;
+					break;
+				}
+			}
 
-		if(length < 252)
-			extraBytes = 1; else extraBytes = 3;
-
-		uint8_t checksum_val = calcCRC(&pkg[CMD_PKG_LEN], (length + extraBytes));
-
-		if (!(checksum == checksum_val)) {
-			xprintf("checksum Failed: provided: %X  calculated %X \n", checksum,
-					checksum_val);
-			return;
 		}
-	} else if (pkg[CMD_PKG_PREAMBLE0] == END_OF_PREVIOUS_TRANSFER) {
 
+	}
+
+	/*
+	 * End of (multiple) packages, copy remaining bytes and 'submit'
+	 */
+	if (pkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_CONTINUE) {
 		for (uint8_t x = 0; x < 4; x++) {
-			if (store.set[x] == 2) { //2 indicates partial
-				//todo should be on byte level, will fail, on multi-byte-len
-				checksum = store.msg[x].raw[CMD_PKG_LINGO_ID
-						+ store.msg[x].length]; //includes any offsets after length idx
+			if (store.set[x] == MORE_DATA_PENDING) { //2 indicates partial entry already
+				uint8_t startPos = store.msg[x].nextWrite; //nextwRITE FILLED AT PREVIOUS ENTRY
 
-				if(store.msg[x].length < 252)
-							extraBytes = 1; else extraBytes = 3;
+				const uint8_t offSetHidLcb = 2;
 
+				uint8_t it = 0;
+				while (store.msg[x].remaining_copy_bytes > 0) { //copy whole frame, minus hid-rep and linkbyte
+					store.msg[x].raw[store.msg[x].nextWrite] = pkg[it
+							+ offSetHidLcb];
+					store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
+					store.msg[x].remaining_copy_bytes--; //decrement total amount of bytes to copy
+					it++;
+				}
+				//update record, make sure its processed further down
+				//store.set[x] = 1;
+
+				if (length < 252)
+					extraBytes = 1;
+				else
+					extraBytes = 3;
+				checksum = pkg[it + offSetHidLcb]; //includes any offsets after length idx
 
 				uint8_t checksum_val = calcCRC(&store.msg[x].raw[CMD_PKG_LEN],
-						(length +extraBytes));
-				if (!(checksum == checksum_val)) {
-					xprintf(
-							"checksum multippkg Failed: provided: %X  calculated %X \n",
+						(store.msg[x].length + extraBytes));
+
+				if (checksum != checksum_val) {
+					xprintf("checksum Failed: provided: %X  calculated %X \n",
 							checksum, checksum_val);
 					return;
+				} else {
+					//ok
+					store.set[x] = READY_TO_PROCESS;
 
+					return;
+					break;
 				}
-
 			}
+
 		}
 
-		//store stuffs
 	}
 
-	if (pkg[CMD_PKG_PREAMBLE0] == COMPLETE_PKG
-				|| pkg[CMD_PKG_PREAMBLE0] == EXTENDED_PKG){
-	for (uint8_t x = 0; x < 4; x++) {
-		if (store.set[x] == 0) {
-			store.msg[x].len = len;
-			store.msg[x].lingoID = lingoID;
-			store.msg[x].commandId = commandID;
-			store.msg[x].transID = transID;
-			store.msg[x].length = length;
-			store.msg[x].nextWrite =0;
-
-			for (int y = 0; y < len; y++) {
-				store.msg[x].raw[y] = pkg[y];
-				store.msg[x].nextWrite++;
-			}
-			switch (pkg[1]) {
-			case COMPLETE_PKG:
-				store.set[x] = 1;
-				return;
-				break;
-
-			case EXTENDED_PKG:
-				store.set[x] = 2;
-				return;
-				break;
-
-			case END_OF_PREVIOUS_TRANSFER:
-				store.set[x] = 1;
-				return;
-				break;
-			}
-
-		} else
-			break;
-	}
-	}
-
-	//vieze hack
-	//if (commandID == 0x38) {
-	//	_transState.lastCmd = INIT;
-	////	_transState.oldestTransActionNumber = transID;
-	//}
+//vieze hack
+//if (commandID == 0x38) {
+//	_transState.lastCmd = INIT;
+////	_transState.oldestTransActionNumber = transID;
+//}
 }
 
 //p150MFiAccessoryFirmwareSpecificationR46NoRestriction
@@ -243,12 +287,12 @@ void processInbound(uint8_t *pkg, uint8_t len) {
 void processTransport() {
 
 	for (uint8_t x = 0; x < 4; x++) {
-		if (store.set[x] == 1) {
+		if (store.set[x] == READY_TO_PROCESS) {
 			switch (store.msg[x].lingoID) {
 			case 0x00:
 				//call lingo generic
 				processLingoGeneral(store.msg[x]);
-				store.set[x] = 0;
+				store.set[x] = EMPTY;
 				break;
 
 			default:
