@@ -37,7 +37,8 @@ typedef struct {
 } typedefTransportState;
 
 /* src https://github.com/oandrew/ipod/blob/master/hid/report_def.go
- * 	ReportDef{ID: 0x01, Len: 12, Dir: ReportDirAccIn},
+ *
+ ReportDef{ID: 0x01, Len: 12, Dir: ReportDirAccIn},
  ReportDef{ID: 0x02, Len: 14, Dir: ReportDirAccIn},
  ReportDef{ID: 0x03, Len: 20, Dir: ReportDirAccIn},
  ReportDef{ID: 0x04, Len: 63, Dir: ReportDirAccIn},
