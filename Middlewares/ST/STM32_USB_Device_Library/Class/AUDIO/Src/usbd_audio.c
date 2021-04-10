@@ -913,6 +913,7 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 
 void printPackage(uint8_t *pkg, uint8_t len, uint8_t dir) {
 
+
 	if(dir == 0){
 		 xprintf("ACC ");
 	}else{
