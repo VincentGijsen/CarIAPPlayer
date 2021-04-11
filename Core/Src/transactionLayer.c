@@ -507,16 +507,17 @@ void processTransport() {
 	for (uint8_t x = 0; x < 4; x++) {
 		if (store.set[x] == READY_TO_PROCESS) {
 			switch (store.msg[x].lingoID) {
-			case 0x00:
+			case LingoGeneral:
 				//call lingo generic
 				processLingoGeneral(store.msg[x]);
 				break;
-			case 0x04:
+			case LingoExtended:
 				processLingoExtendedInterface(store.msg[x]);
 				break;
 
-			case 0x0a:
-				processLingoAdditional(store.msg[x]);
+			case LingoDigitalAudio:
+				processLingoDigitalAudio(store.msg[x]);
+				break;
 
 			default:
 				//not implemented

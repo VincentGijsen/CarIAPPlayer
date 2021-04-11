@@ -40,7 +40,7 @@ void processLingoGeneral(IAPmsg msg) {
 	case 0x07: //RequestIpodName
 	{
 		const uint8_t returnIpodNameCmd = 0x08;
-		const uint8_t name = { 'C', 'a', 'r', 'p', 'o', 'd', 0 };
+		const uint8_t name[] = { 'C', 'a', 'r', 'p', 'o', 'd', 0 };
 		initResponse(LingoGeneral, returnIpodNameCmd, msg.transID);
 		addResponsePayload(&name, sizeof(name));
 		transmitToAcc();

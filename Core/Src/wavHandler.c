@@ -30,6 +30,9 @@ struct header {
 	int data_size;
 } head;
 
+struct {
+	uint8_t isPLaying;
+} playerState;
 /*
  * protos
  */
@@ -38,6 +41,7 @@ WAV_BUFFER_STATUS WavUpdateBuffers();
 
 void WavInit() {
 	FRESULT fr;
+	playerState.isPLaying = 0;
 
 	xprintf("Mounting FS \n");
 
@@ -72,12 +76,56 @@ void WavInit() {
 	while (read[0] != 'd') {
 		f_read(&SDFile, read, sizeof read, &a);
 	}
+	initBuffer();
+	playerState.isPLaying = 1;
+}
+
+void PlayFile() {
+
+}
+
+/*
+ * called often enough to top-up buffer
+ */
+void WavPlayNonBlocking() {
+	if (playerState.isPLaying == 1) {
+		switch (head.bits_per_sample) {
+
+		case 16: {
+			if (head.sample_rate == 48000) {
+				//xprintf("starting to fill buffer\n");
+
+				uint8_t slots_to_be_filled = getFreeSlotsInBuffer();
+
+				if (slots_to_be_filled > 1) {
+					//xprintf("topping op buffer\n");
+					WAV_BUFFER_STATUS res;
+					res = WavUpdateBuffers();
+					if (res != WAV_BUFFER_OK) {
+						playerState.isPLaying = 0;
+						xprintf("Buffer running low\n");
+					}
+
+				}
+
+			}
+
+		}
+			break;
+
+		default:
+			xprintf("this file cannot be played..\n");
+
+		}
+	} else {
+		//nothing to do
+	}
 }
 
 void WavPlayBlocking() {
 	xprintf("going to play");
 	uint8_t run = 1;
-	initBuffer();
+	//initBuffer();
 
 	switch (head.bits_per_sample) {
 

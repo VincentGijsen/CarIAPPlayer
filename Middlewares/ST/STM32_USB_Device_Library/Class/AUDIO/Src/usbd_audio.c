@@ -190,8 +190,8 @@ __ALIGN_BEGIN static uint8_t USBD_AUDIO_CfgDesc[USB_AUDIO_CONFIG_DESC_SIZ
 				0x01,  //bNumInterfaces
 				0x01,  //bConfigurationValue
 				0x00,  //iConfiguration
-				0xC0,  //bmAttributes  BUS Powred
-				0x32,  //bMaxPower = 100 mA
+				0x80,  //bmAttributes  ONLYbuspowered
+				0x64,  //bMaxPower = 100 mA
 				//Configuration 1
 				//9 bytes
 
@@ -584,15 +584,21 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 
 	case USB_REQ_TYPE_CLASS: /* BIT 5=1*/
 	{
+		uint8_t type = (req->bmRequest >> 5);
+		uint8_t iface = (req->bmRequest & 0b00011111);
+
+		xprintf("Class: type:: %x, iface; %x\n", type, iface);
+
+
 		switch (req->bRequest) {
 		//case HID_REQ_SET_PROTOCOL:
 		xprintf("USB_REQ_TYPE_CLASS \n");
-		/*
+
 		 case AUDIO_REQ_GET_CUR:
 		 AUDIO_REQ_GetCurrent(pdev, req);
 		 break;
-		 */
-//	case AUDIO_REQ_SET_CUR: /* 0b10100001 -> https://www.usb.org/sites/default/files/audio10.pdf p66)
+
+	//case AUDIO_REQ_SET_CUR: /* 0b10100001 -> https://www.usb.org/sites/default/files/audio10.pdf p66)
 		/* NOT USED BY hid */
 		//	AUDIO_REQ_SetCurrent(pdev, req);
 		//	break;
@@ -604,6 +610,9 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		uint8_t hid_report_type = (req->wValue >> 8);
 		uint8_t hid_report_id = (req->wValue & 0xff);
 		uint8_t req_interface = (req->wIndex & 0xff);
+
+		xprintf("USB CALL int %d\n", req_interface);
+
 		uint8_t hid_report_len = req->wLength;
 		uint8_t *dummy = malloc(hid_report_len);
 		if(dummy){
@@ -634,7 +643,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		uint8_t hid_report_id = (req->wValue & 0xff);
 		uint8_t req_interface = (req->wIndex & 0xff);
 		uint8_t hid_report_len = req->wLength;
-		//xprintf("HID_REQ_SET_REPORT T:%d, ID:%d, INT:%d, LEN:%d\n", hid_report_type, hid_report_id, req_interface, hid_report_len);
+		xprintf("HID_REQ_SET_REPORT T:%d, ID:%d, INT:%d, LEN:%d\n", hid_report_type, hid_report_id, req_interface, hid_report_len);
 
 		if (hid_report_len != 0U) {
 				/* Prepare the reception of the buffer over EP0 */
@@ -686,6 +695,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		case USB_REQ_CLEAR_FEATURE: /* 0x01 */
 		case USB_REQ_SET_FEATURE: /* 0x03 */
 		case USB_REQ_SET_ADDRESS: /* 0x05 */
+			xprintf("USB::unimplemented feature req: %x\n", req->bRequest);
 			break;
 
 		case USB_REQ_GET_DESCRIPTOR: /* 0x06 */
@@ -912,7 +922,7 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 }
 
 void printPackage(uint8_t *pkg, uint8_t len, uint8_t dir) {
-
+return;
 
 	if(dir == 0){
 		 xprintf("ACC ");

@@ -50,14 +50,15 @@ extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint16_t podTransactionCounter ;
 
 
-#define LingoAdditional 0x0a
+//#define LingoAdditional 0x0a
 #define LingoGeneral 0x00
 #define LingoExtended 0x04
+#define LingoDigitalAudio 0x0a
 
 
 //protos
 void processLingoGeneral(typeDefMessage);
-void processLingoAdditional(IAPmsg msg);
+void processLingoDigitalAudio(IAPmsg msg);
 void processLingoExtendedInterface(IAPmsg msg) ;
 
 void scheduleTasks(typeDefTask task);
@@ -67,6 +68,7 @@ void taskInitializeAuthentication();
 
 //extended
 void taskProcessQuery();
-
+void taskPlayControlCommand();
+void taskTrackChanged();
 
 #endif /* INC_LINGOS_H_ */
