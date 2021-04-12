@@ -10,6 +10,8 @@
 #include "xprintf.h"
 #include "utils.h"
 
+#include "MusicManager.h"
+
 typedef enum {
 	WAV_BUFFER_OK, WAV_BUFFER_ERROR, WAV_BUFFER_EOF
 } WAV_BUFFER_STATUS;
@@ -32,7 +34,7 @@ struct header {
 
 struct {
 	uint8_t isPLaying;
-} playerState;
+} _wavPlayerState;
 /*
  * protos
  */
@@ -40,25 +42,19 @@ struct {
 WAV_BUFFER_STATUS WavUpdateBuffers();
 
 void WavInit() {
-	FRESULT fr;
-	playerState.isPLaying = 0;
+	xprintf("WavInit\n");
+	_wavPlayerState.isPLaying = 0;
+	initBuffer();
+	//xprintf("file setup, ready to fill buffers\n");
+}
 
-	xprintf("Mounting FS \n");
+void WavPlayFile() {
+	xprintf("WavPlayFile: file: %s, ", MMGetCurrentFilePath());
 
-	fr = f_mount(&SDFatFS, "", 0);
+	FRESULT res = f_open(&SDFile, MMGetCurrentFilePath(), FA_READ);
 
-	if (fr != FR_OK) {
-		xprintf("Failed to mount FS\n");
-		while (1) {
-		};
-	}
-
-	fr = f_open(&SDFile, "1.wav", FA_READ);
-	if (fr != FR_OK) {
-		xprintf("Failed to mount file\n");
-		while (1) {
-		};
-	}
+	if (res != FR_OK)
+			return 1;
 
 	/*
 	 * read header
@@ -66,9 +62,12 @@ void WavInit() {
 	UINT a = 0;
 	char read[4];
 
-	f_read(&SDFile, &head, sizeof head, &a);
-	if (fr != FR_OK)
+	res = f_read(&SDFile, &head, sizeof head, &a);
+	if (res != FR_OK)
 		return 1;
+
+	//initBuffer();
+	_wavPlayerState.isPLaying = 1;
 
 	if (head.data_id[0] != 'L')
 		return 1;
@@ -76,19 +75,18 @@ void WavInit() {
 	while (read[0] != 'd') {
 		f_read(&SDFile, read, sizeof read, &a);
 	}
-	initBuffer();
-	playerState.isPLaying = 1;
+
 }
 
-void PlayFile() {
-
+uint8_t WavIsPlaying(){
+	return _wavPlayerState.isPLaying;
 }
 
 /*
  * called often enough to top-up buffer
  */
 void WavPlayNonBlocking() {
-	if (playerState.isPLaying == 1) {
+	if (_wavPlayerState.isPLaying == 1) {
 		switch (head.bits_per_sample) {
 
 		case 16: {
@@ -102,8 +100,9 @@ void WavPlayNonBlocking() {
 					WAV_BUFFER_STATUS res;
 					res = WavUpdateBuffers();
 					if (res != WAV_BUFFER_OK) {
-						playerState.isPLaying = 0;
-						xprintf("Buffer running low\n");
+						_wavPlayerState.isPLaying = 0;
+						xprintf("Buffer running low or ERR\n");
+						WavStop();
 					}
 
 				}
@@ -115,10 +114,12 @@ void WavPlayNonBlocking() {
 
 		default:
 			xprintf("this file cannot be played..\n");
-
+			_wavPlayerState.isPLaying=0;
 		}
 	} else {
 		//nothing to do
+		_wavPlayerState.isPLaying=0;
+
 	}
 }
 
@@ -188,6 +189,9 @@ WAV_BUFFER_STATUS WavUpdateBuffers() {
 	return WAV_BUFFER_ERROR;
 }
 
-void WaveStop() {
+void WavStop() {
+	_wavPlayerState.isPLaying=0;
+
+	FRESULT res = f_close(&SDFile); //(&SDFile, MMGetCurrentFilePath(), FA_READ);
 
 }

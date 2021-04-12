@@ -8,15 +8,9 @@
 #ifndef INC_UTILS_H_
 #define INC_UTILS_H_
 
-#define MAX_FILES_COUNT 10
-#define MAX_FILE_PATH_LENGTH  50
 
 #include "stdint.h"
 
-typedef struct {
-    char files[MAX_FILES_COUNT][MAX_FILE_PATH_LENGTH + 1];
-    int count;
-} Files;
 
 #define AUDIO_CircularBuffer_SLOTS 20
 typedef struct {
@@ -39,7 +33,7 @@ typedef enum{
 	BUFFER_UNDERRUN
 }BUFFER_RESULT;
 
-void FindFlacFiles(const char *path, Files *files);
+//void FindFlacFiles(const char *path, Files *files);
 
 BUFFER_RESULT initBuffer();
 BUFFER_RESULT getBuffer(_AUDIO_FRAME volatile **ptr);

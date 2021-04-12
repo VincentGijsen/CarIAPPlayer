@@ -22,7 +22,7 @@ static const char* GetCurrentFilePath(void);
  * Statics vars
  */
 static FATFS fs __attribute__((section("ccmram")));;
-static Files files __attribute__((section("ccmram")));;
+//static Files files __attribute__((section("ccmram")));;
 static int current_file_index = 0;
 
 static uint8_t bench = 0;
@@ -85,7 +85,7 @@ void StartTaskFS(void *argument) {
 
 	FindFlacFiles("0:", &files);
 
-	xprintf("found %d files\n", files.count);
+//	xprintf("found %d files\n", files.count);
 
 	current_file_index = 0;
 //	flac_play_song(GetCurrentFilePath());

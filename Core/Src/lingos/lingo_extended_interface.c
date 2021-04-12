@@ -10,6 +10,9 @@
 #include "stdint.h"
 #include "xprintf.h"
 
+#include "MusicManager.h"
+
+
 #define EXTENDED_ACK_CMD 0x01
 
 #define DB_CAT_TOP 0x00
@@ -99,6 +102,8 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		addResponsePayload(&success, sizeof(success));
 		transmitToAcc();
 
+		//kickoff Music Manager
+		MMInit();
 	}
 		break;
 
@@ -219,6 +224,19 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	}
 
 		break;
+
+	case 0x28: //PlayCurrentSelection [@deprecated]
+	{
+		const cmdToAck = 0x28;
+				const uint8_t success = { 0x00, 0x00, cmdToAck };
+
+				//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
+				initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
+				addResponsePayload(&success, sizeof(success));
+				transmitToAcc();
+
+	}
+	break;
 
 	case 0x29: //PlayControl
 	{
@@ -393,9 +411,11 @@ void taskPlayControlCommand() {
 	case 0x07: //end ff / rew
 		break;
 	case 0x08: //next
+MMSendEvent(MMNext);
 		trackCHangeAction = 1;
 		break;
 	case 0x09: //prev
+		MMSendEvent(MMPrevious);
 		trackCHangeAction = 1;
 		break;
 	case 0x1a: //play

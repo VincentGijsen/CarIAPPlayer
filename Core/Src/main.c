@@ -97,6 +97,10 @@ int main(void)
   MX_DMA_Init();
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
+
+  //processMusicManager();
+
+
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
@@ -107,8 +111,8 @@ int main(void)
 
 
   //Wave implementation
-WavInit();
-WavPlayNonBlocking();
+//WavInit();
+//WavPlayNonBlocking();
 //WavPlayBlocking();
 
 
@@ -118,9 +122,11 @@ WavPlayNonBlocking();
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  WavPlayNonBlocking();
+	 // WavPlayNonBlocking();
+
 	  processTransport();
 	  processTasks();
+	  processMusicManager();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
