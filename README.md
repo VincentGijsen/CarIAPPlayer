@@ -24,12 +24,15 @@ is on-going development (until its no longer ;), at this point (28-03-2021), usb
 
 next steps are 
 1) ~~integrade HID descriptor~~
-2) integrate HID logic (lingos)
+2) ~~integrate HID logic (lingos)~~
 3) test...
 4) state machines for
- * playback
- * meta-data
- * remote control
+ * ~~playback~~
+ * ~~meta-data~~ (sort of)
+ * ~~remote control~~
+ * codecs [flac/mp3/..]
+ * better handling of fatfs
+ * timout checks to prevent lockups
  * ...
 
 ## Highlights:
