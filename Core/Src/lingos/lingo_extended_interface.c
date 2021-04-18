@@ -12,21 +12,7 @@
 
 #include "MusicManager.h"
 
-
 #define EXTENDED_ACK_CMD 0x01
-
-#define DB_CAT_TOP 0x00
-#define DB_CAT_PLAYLIST 0x01
-#define DB_CAT_ARTIST  0x02
-#define DB_CAT_ALBUM 0x03
-#define DB_CAT_GENRE 0x04
-#define DB_CAT_TRACK 0x05
-#define DB_CAT_COMPOSER 0x06
-#define DB_CAT_AUDIO_BOOK 0x07
-#define DB_CAT_PODCAST 0x08
-#define DB_CAT_NESTED_PLAYLIST 0x09
-#define DB_CAT_GENIUSPLAYLIST 0x0A
-#define DB_CAT_ITUNES 0x0B
 
 struct {
 	uint8_t type;
@@ -61,26 +47,54 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		const uint8_t ReturnIndexedPlayingTrackInfo = 0xd;
 		initResponse(LingoExtended, ReturnIndexedPlayingTrackInfo, msg.transID);
 
+		xprintf("trackInfoRequested: %x\n", trackInfoType);
+		/*
+		 * TODO: plug in meta shizzle
+		 */
+		uint8_t payload[30] = { 0 };
+		uint8_t sendLengthPayload = 0;
+
 		switch (trackInfoType) {
-		case 0x00:
-		case 0x01:
-		case 0x02:
-		case 0x05:
-		case 0x06:
-		case 0x07: {
-			uint8_t empty[1] = { 0 };
+		case 0x00: //capabilities
+		{
+			payload[4] =
+					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 24);
+			payload[5] =
+					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 16);
+			payload[6] =
+					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 8);
+			payload[7] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs
+					& 0x00);
+			sendLengthPayload = 10;
+			addResponsePayload(&payload, sizeof(sendLengthPayload));
+		}
+		case 0x01: //podcastname
+		case 0x02: //track release date
+		case 0x05: //track genre
+		case 0x06: // trac composer
+		{
+			uint8_t empty[2] = { trackInfoType, 0 };
+			addResponsePayload(&empty, sizeof(empty));
+		}
+			break;
+
+		case 0x07: //track artwork count
+		{
+			uint8_t empty[5] = { trackInfoType, 0, 0, 0, 0 };
 			addResponsePayload(&empty, sizeof(empty));
 
 		}
 			break;
 
-		case 0x03:
-		case 0x04: {
+		case 0x03: //description
+		case 0x04: //lyrics
+		{
 			uint8_t empty[5] = { 0 };
 			addResponsePayload(&empty, sizeof(empty));
 
 		}
 		}
+
 		transmitToAcc();
 	}
 		break;
@@ -102,6 +116,8 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		addResponsePayload(&success, sizeof(success));
 		transmitToAcc();
 
+		MMResetSelections();
+
 		//kickoff Music Manager
 		MMInit();
 	}
@@ -114,6 +130,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		int32_t dbRecordIdx = (msg.raw[10] << 24) | (msg.raw[11] << 16)
 				| (msg.raw[12] << 8) | (msg.raw[13]);
 
+		MMSelectItem(dbCategoryRequested, dbRecordIdx);
 		//acc selected record
 		const cmdToAck = 0x17;
 		const uint8_t success = { 0x00, 0x00, cmdToAck };
@@ -126,31 +143,32 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x18: //GetNumberCategorizedDBRecords
 	{
-		uint8_t dbCategoryRequested = msg.raw[9];
-		xprintf("requested category: %d\n", dbCategoryRequested);
+		uint8_t catReq = msg.raw[9];
+		xprintf("GetNumberCategorizedDBRecords requested category: %d\n",
+				catReq);
 
 		const uint8_t returnNumberCategorizedDBRecordsCmd = 0x19;
 		initResponse(LingoExtended, returnNumberCategorizedDBRecordsCmd,
 				msg.transID);
 
-		switch (dbCategoryRequested) {
-		case DB_CAT_TOP:
-		case DB_CAT_ALBUM:
-		case DB_CAT_ARTIST:
-		case DB_CAT_TRACK:
-		{
-			uint8_t numberOfRecords[] = { 0, 0, 0, 1 };
-			addResponsePayload(&numberOfRecords, sizeof(numberOfRecords));
+		uint8_t numberOfRecords[4];
+		uint32_t numberOfTracks = 0;
 
-		}
+		switch (catReq) {
+		case 0x01:
+			numberOfTracks = MMgetNumberOfPLaylists();
 			break;
 
-		default: {
-			uint8_t numberOfRecords[] = { 0, 0, 0, 0 };
-			addResponsePayload(&numberOfRecords, sizeof(numberOfRecords));
+		default:
+			//to implement
+			;
 		}
+		numberOfRecords[0] = numberOfTracks >> 24;
+		numberOfRecords[1] = numberOfTracks >> 16;
+		numberOfRecords[2] = numberOfTracks >> 8;
+		numberOfRecords[3] = numberOfTracks & 0xff;
 
-		}
+		addResponsePayload(&numberOfRecords, sizeof(numberOfRecords));
 
 		transmitToAcc();
 
@@ -180,17 +198,18 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x1e: //GetCurrentPlayingTrackIndex
 	{
+		xprintf("GetCurrentPlayingTrackIndex\n");
 		const uint8_t ReturnCurrentPlayingTrackIndexCmd = 0x1f;
 		initResponse(LingoExtended, ReturnCurrentPlayingTrackIndexCmd,
 				msg.transID);
 
-		uint8_t res[4] = { 0xff, 0xff, 0xff, 0xff };
+		uint8_t res[4] = { 0xFf, 0xff, 0xff, 0xff };
 
 		if (playbackStatus.playingOrPause) {
-			res[0] = (playbackStatus.trackId >> 24);
-			res[1] = (playbackStatus.trackId >> 16);
-			res[2] = (playbackStatus.trackId >> 8);
-			res[3] = (playbackStatus.trackId & 0xff);
+			res[0] = (MMgetSongDetailsOfCurrent()->trackIdx >> 24);
+			res[1] = (MMgetSongDetailsOfCurrent()->trackIdx >> 16);
+			res[2] = (MMgetSongDetailsOfCurrent()->trackIdx >> 8);
+			res[3] = (MMgetSongDetailsOfCurrent()->trackIdx & 0xff);
 
 		} else {
 			//init value is correct for stopped state
@@ -228,15 +247,15 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x28: //PlayCurrentSelection [@deprecated]
 	{
 		const cmdToAck = 0x28;
-				const uint8_t success = { 0x00, 0x00, cmdToAck };
+		const uint8_t success = { 0x00, 0x00, cmdToAck };
 
-				//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
-				initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
-				addResponsePayload(&success, sizeof(success));
-				transmitToAcc();
+		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
+		initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
+		addResponsePayload(&success, sizeof(success));
+		transmitToAcc();
 
 	}
-	break;
+		break;
 
 	case 0x29: //PlayControl
 	{
@@ -269,6 +288,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		initResponse(LingoExtended, ReturnShuffleCMD, msg.transID);
 		addResponsePayload(&shuffleTracks, sizeof(shuffleTracks));
 		transmitToAcc();
+
+		xprintf("bogus track-change on track-reading\n");
+		typeDefTask task;
+		task.f = &taskTrackChanged;
+		task.scheduledAfter = uwTick + 2000;
+		scheduleTasks(task);
 	}
 
 		break;
@@ -284,6 +309,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	{
 		uint8_t newShuffleState = msg.raw[9];
 		uint8_t setOnRestore = msg.raw[10];
+
 	}
 		break;
 
@@ -340,14 +366,22 @@ void taskProcessQuery() {
 			prepareRecord(open_query.start, "TOP", 3);
 
 		}
+
+			break;
+
+		case DB_CAT_PLAYLIST: {
+			uint8_t content[50];
+			uint8_t len=0;
+			MMgetPlaylistItem(open_query.start, &content, &len);
+			prepareRecord(open_query.start, &content, len);
+			{
+
+			}
+		}
 			break;
 
 		case DB_CAT_ALBUM: {
 			prepareRecord(open_query.start, "Beatles", 7);
-		}
-			break;
-		case DB_CAT_PLAYLIST: {
-			prepareRecord(open_query.start, "pl1", 7);
 		}
 			break;
 
@@ -359,13 +393,6 @@ void taskProcessQuery() {
 
 		case DB_CAT_TRACK: {
 			prepareRecord(open_query.start, "Track something", 15);
-			{
-				xprintf("bogus track-change on track-reading\n");
-				typeDefTask task;
-				task.f = &taskTrackChanged;
-				task.scheduledAfter = uwTick + 2000;
-				scheduleTasks(task);
-			}
 
 		}
 			break;
@@ -411,7 +438,7 @@ void taskPlayControlCommand() {
 	case 0x07: //end ff / rew
 		break;
 	case 0x08: //next
-MMSendEvent(MMNext);
+		MMSendEvent(MMNext);
 		trackCHangeAction = 1;
 		break;
 	case 0x09: //prev

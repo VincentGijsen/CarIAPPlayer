@@ -99,7 +99,7 @@ int main(void)
   MX_FATFS_Init();
 
   //processMusicManager();
-
+ // MMInit();
 
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */

@@ -40,8 +40,10 @@ struct {
  */
 
 WAV_BUFFER_STATUS WavUpdateBuffers();
+SongDetails *_songDetails;
 
-void WavInit() {
+void WavInit(SongDetails *songDetails) {
+	_songDetails = songDetails;
 	xprintf("WavInit\n");
 	_wavPlayerState.isPLaying = 0;
 	initBuffer();
@@ -49,7 +51,7 @@ void WavInit() {
 }
 
 void WavPlayFile() {
-	xprintf("WavPlayFile: file: %s, ", MMGetCurrentFilePath());
+	xprintf("WavPlayFile: file: %s, \n", MMGetCurrentFilePath());
 
 	FRESULT res = f_open(&SDFile, MMGetCurrentFilePath(), FA_READ);
 
@@ -69,6 +71,11 @@ void WavPlayFile() {
 	//initBuffer();
 	_wavPlayerState.isPLaying = 1;
 
+	/*set details */
+	uint16_t seconds = head.data_size / (head.byte_rate);
+	_songDetails->timeDurationTotalMs = seconds *10;
+	_songDetails->timePositionMs=0;
+
 	if (head.data_id[0] != 'L')
 		return 1;
 
@@ -78,15 +85,19 @@ void WavPlayFile() {
 
 }
 
-uint8_t WavIsPlaying(){
+/*
+ * returns 1 if track is playing
+ */
+inline uint8_t WavIsPlaying(){
 	return _wavPlayerState.isPLaying;
 }
+
 
 /*
  * called often enough to top-up buffer
  */
 void WavPlayNonBlocking() {
-	if (_wavPlayerState.isPLaying == 1) {
+	if (WavIsPlaying) {
 		switch (head.bits_per_sample) {
 
 		case 16: {
@@ -99,6 +110,9 @@ void WavPlayNonBlocking() {
 					//xprintf("topping op buffer\n");
 					WAV_BUFFER_STATUS res;
 					res = WavUpdateBuffers();
+					//every buffer etnry is 1ms of time, so simply increment untill done...
+					_songDetails->timePositionMs++;
+
 					if (res != WAV_BUFFER_OK) {
 						_wavPlayerState.isPLaying = 0;
 						xprintf("Buffer running low or ERR\n");
@@ -123,6 +137,9 @@ void WavPlayNonBlocking() {
 	}
 }
 
+/*
+ * Blocks return untill all bytes from WAV are read
+ */
 void WavPlayBlocking() {
 	xprintf("going to play");
 	uint8_t run = 1;

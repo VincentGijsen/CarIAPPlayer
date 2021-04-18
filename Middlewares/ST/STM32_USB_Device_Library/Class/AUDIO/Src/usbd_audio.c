@@ -589,7 +589,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		uint8_t type = (req->bmRequest >> 5);
 		uint8_t iface = (req->bmRequest & 0b00011111);
 
-		xprintf("Class: type:: %x, iface; %x\n", type, iface);
+		//xprintf("Class: type:: %x, iface; %x\n", type, iface);
 
 		switch (req->bRequest) {
 		//case HID_REQ_SET_PROTOCOL:
@@ -612,7 +612,7 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		uint8_t hid_report_id = (req->wValue & 0xff);
 		uint8_t req_interface = (req->wIndex & 0xff);
 
-		xprintf("USB CALL int %d\n", req_interface);
+		//xprintf("USB CALL int %d\n", req_interface);
 
 		uint8_t hid_report_len = req->wLength;
 		uint8_t *dummy = malloc(hid_report_len);
@@ -642,8 +642,8 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 		uint8_t hid_report_id = (req->wValue & 0xff);
 		uint8_t req_interface = (req->wIndex & 0xff);
 		uint8_t hid_report_len = req->wLength;
-		xprintf("HID_REQ_SET_REPORT T:%d, ID:%d, INT:%d, LEN:%d\n",
-				hid_report_type, hid_report_id, req_interface, hid_report_len);
+	//	xprintf("HID_REQ_SET_REPORT T:%d, ID:%d, INT:%d, LEN:%d\n",
+	//			hid_report_type, hid_report_id, req_interface, hid_report_len);
 
 		if (hid_report_len != 0U) {
 			/* Prepare the reception of the buffer over EP0 */
@@ -927,7 +927,7 @@ static uint8_t USBD_AUDIO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 
 void printPackage(uint8_t *pkg, uint8_t len, uint8_t dir) {
 
-
+//return;
 	if (dir == 0) {
 		xprintf("ACC ");
 	} else {

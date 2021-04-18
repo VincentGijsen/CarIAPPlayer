@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "xprintf.h"
 #include "MusicManager.h"
+
 #include "lingos.h"
 #include "tasks.h"
 
@@ -27,13 +28,226 @@ struct {
 	uint8_t current_file_index;
 	MMplayserState playerState;
 	Files files;
+	SongDetails song;
 
 }static _MMstate; //__attribute__((section("ccmram")));
 
+tMusicDB musicDb;
 uint8_t _MMboot = 0;
 
 //waste rsult var
 FRESULT fr;
+
+static IdxRepository MyMusicDB;
+#define MAX_DIR_NAME_LEN (13+4)
+
+int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
+		uint8_t *pNameLen, uint8_t *pLastDirFoundCnt);
+
+int8_t mmGetFileInDir(uint8_t fileIdx, char *dirPath,
+		uint8_t *pLastFileFoundCnt, uint8_t bUpdateRepo, char *retVal) {
+
+	char path[20];
+	path[0] = '0';
+	path[1] = ':';
+	path[2] = '/'; //"0:/";
+
+	uint8_t len = strlen(dirPath);
+	strncpy(&path[3], dirPath, len);
+	path[3+len] = '\0'; //add aditional zero for proper 'string'
+	//by now the path should equal root+dir
+	DIR dir;
+	FRESULT res;
+	xprintf("opening dir: %s\n", path);
+	res = f_opendir(&dir, path);
+
+	if (res != FR_OK) {
+		xprintf("Error: mmGetFileInDirectoryByIdxe f_opendir: %s\n", path);
+		return -1;
+	}
+
+	uint8_t searchIdx = 0;
+	while (searchIdx < 254) {
+
+		FILINFO file_info;
+		res = f_readdir(&dir, &file_info);
+		if (res != FR_OK) {
+			xprintf("Error: f_readdir\n");
+			return -1;
+		}
+
+		//break on end of dir
+		if (file_info.fname[0] == '\0') {
+
+			return -1;
+		}
+		if (!(file_info.fattrib & AM_DIR)) {
+
+			*pLastFileFoundCnt = searchIdx;
+
+			xprintf("found file %s \n", file_info.fname);
+
+			uint8_t len = strlen(&file_info.fname);
+			if (len >= 5 && len <= MAX_FILE_PATH_LENGTH
+					&& strcmp(&file_info.fname[len - 4], ".WAV") == 0) {
+
+				//WE HAVE A PLAYABLE FILE
+				//thisi is the dir # we searched for
+				uint8_t len = strlen(file_info.fname);
+				strncpy(&(retVal), file_info.fname, len);
+
+				//return 1 to indicate we found the requested file
+				//important to check here as wel!!
+				if (searchIdx == fileIdx) {
+
+					return 1;
+				}
+
+			}					//not a 'playable file'
+			else {
+
+			}
+
+		}
+		//return 1 to indicate we found the requested file
+		if (searchIdx == fileIdx) {
+
+			return 1;
+		}
+		searchIdx++;
+
+	};
+	return -1;
+
+}
+
+/*
+ * returns;
+ * -1 ERROR
+ * 0 NOT FOUND THIS ITERATION
+ * 1 COMPLETED
+ */
+
+int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
+		uint8_t *pNameLen, uint8_t *pLastDirFoundCnt) {
+	FRESULT res;
+	//const char *path = "0:/";
+	pName[0] = '0';
+	pName[1] = ':';
+	pName[2] = '/';
+	pName[3] = 0;
+	DIR dir;
+
+	res = f_opendir(&dir, pName);
+	if (res != FR_OK) {
+		xprintf("Error: f_opendir: %s\n", pName);
+		return -1;
+	}
+
+	uint8_t searchIdx = 0;
+	while (searchIdx < 254) {
+
+		FILINFO file_info;
+		res = f_readdir(&dir, &file_info);
+		if (res != FR_OK) {
+			xprintf("Error: f_readdir\n");
+			//f_closedir(dir);
+			return -1;
+		}
+
+		//break on end of dir
+		if (file_info.fname[0] == '\0') {
+			//f_closedir(dir);
+			return -1;
+		}
+		MyMusicDB.rootInodes[searchIdx].isUsefull = 0;
+		if ((file_info.fattrib & AM_DIR)) {
+			*pLastDirFoundCnt = searchIdx + 1;
+			xprintf("found %d :  dir %s \n", searchIdx, file_info.fname);
+
+			//todo: should be implemented in the music-file-scanner, otherwise emty/non rerelvant will show up
+			MyMusicDB.rootInodes[searchIdx].isUsefull = 1;
+			if (searchIdx == dirIdx) {
+				//thisi is the dir # we searched for
+				uint8_t length = strlen(file_info.fname);
+				if (length > MAX_DIR_NAME_LEN)
+					length = MAX_DIR_NAME_LEN;
+
+				*pNameLen = strlen(file_info.fname);
+				strncpy(&(pName[0]), file_info.fname, *pNameLen);
+				pName[(*pNameLen)] = 0;
+				*pNameLen += 1;
+				return 1;
+			}
+			searchIdx++;
+		}
+	}
+	return -1;
+}
+
+uint8_t runIndexer() {
+	xprintf("Indexer Started...\n");
+	uint32_t start, stop = 0;
+	start = uwTick;
+	uint8_t lastCount = 0;
+	//todo fix for long-filename-support
+	uint8_t len = 0;
+	char dirname[MAX_DIR_NAME_LEN];
+
+	mmGetDirectoryInRootNameByIdx(255, &dirname, &len, &lastCount);
+	MyMusicDB.numOfRootInodes = lastCount;
+
+	char fName[MAX_DIR_NAME_LEN];
+	uint8_t fnameLen, pLas;
+
+	for (uint8_t it = 0; it < MyMusicDB.numOfRootInodes; it++) {
+		uint8_t current[20];
+		uint8_t len=0;
+		uint8_t foundSongs =0;
+		if(MyMusicDB.rootInodes[it].isUsefull){
+			mmGetDirectoryInRootNameByIdx(it, &current, &len, 0);
+			mmGetFileInDir(255, &current, &foundSongs, 1, 0);
+			xprintf("found in %s, %d songs\n", current, foundSongs);
+		}
+		//	uint8_t x = it;
+	//	int8_t ret = 7;
+		//ret = mmGetFileInDirectoryByIdxes //(x, 255, &fName, &len, &lastCount, 1);
+	}
+	int8_t ret = 7;
+
+	/*mmGetFileInDir(uint8_t fileIdx, char *dirPath,
+	 uint8_t *pLastFileFoundCnt, uint8_t bUpdateRepo)
+	 */
+
+	mmGetDirectoryInRootNameByIdx(5, &dirname, &len, &lastCount);
+
+	char pad[] = "DEMO";
+	char fileN[MAX_DIR_NAME_LEN];
+	mmGetFileInDir(255, pad, &len, 1, &fileN);
+
+	for (uint8_t x = 0; x < MyMusicDB.numOfRootInodes; x++) {
+
+		//ret = mmGetFileInDirectoryByIdxes(x, 255, &fName, &len, &lastCount, 1);
+		xprintf("x: %d - dir: %s\n", x, fName);
+	}
+
+	/*for (uint8_t x = 0; x < 8; x++) {
+	 xprintf("x: %d\n", x);
+	 ret = mmGetFileInDirectoryByIdxes(x, 255, &fName, &len, &lastCount, 1);
+	 }
+	 char n[MAX_DIR_NAME_LEN];
+	 mmGetDirectoryInRootNameByIdx(6, &n, 0, 0);
+	 xprintf("Dir #5 name: %s\n", n);
+
+	 mmGetFileInDirectoryByIdxes(6, 3, &n, 0, 0, 0);
+	 xprintf("Dir #5, File  #3 name: %s\n", n);
+
+	 xprintf("found :%d of files\n", lastCount);
+	 xprintf("filename: %s \n", fName);*/
+	stop = uwTick;
+	xprintf("indexing took: %d\n", (stop - start));
+
+}
 
 void FindWavFiles(const char *path, Files *files) {
 	files->count = 0;
@@ -84,6 +298,8 @@ void MMindexerRootfolders() {
 	if (!isDone) {
 		FindWavFiles("0:/DEMO", &_MMstate.files);
 
+		runIndexer();
+
 	}
 	isDone = 1;
 
@@ -96,6 +312,60 @@ void MMindexerRootfolders() {
 	}
 }
 
+uint8_t mmGetActualInodeIdxFromRelative(uint8_t requested) {
+	uint8_t usableCnt = 0;
+
+	for (uint8_t x = 0; x < MyMusicDB.numOfRootInodes; x++) {
+		if (MyMusicDB.rootInodes[x].isUsefull) {
+			usableCnt++;
+			if (usableCnt == requested) {
+				return usableCnt;
+			}
+		}
+	}
+}
+
+void MMResetSelections() {
+	MyMusicDB.selectedRootInode = 0;
+}
+void MMSelectItem(uint8_t category, uint32_t item) {
+	uint8_t req = mmGetActualInodeIdxFromRelative(item);
+	MyMusicDB.selectedRootInode = req;
+}
+/*
+ * track stuff
+ */
+
+uint8_t MMgetNumberOfTracks() {
+	return MyMusicDB.rootInodes[MyMusicDB.selectedRootInode].numberOfTracks;
+}
+
+/*
+ * Playlist sjizzle
+ */
+void MMgetPlaylistItem(uint8_t idx, char *content, uint8_t *len) {
+	uint8_t req = mmGetActualInodeIdxFromRelative(idx);
+	mmGetDirectoryInRootNameByIdx(req, content, len, 0);
+
+}
+
+uint8_t MMgetNumberOfPLaylists() {
+	uint8_t usable = 0;
+	for (uint8_t x = 0; x < MyMusicDB.numOfRootInodes; x++) {
+		if (MyMusicDB.rootInodes[x].isUsefull) {
+			usable++;
+		}
+	}
+
+	return usable;
+}
+
+tMusicDB* MMgetMusicDB() {
+	return &musicDb;
+}
+SongDetails* MMgetSongDetailsOfCurrent() {
+	return &_MMstate.song;
+}
 //call to start, only after accesoire-init!!
 void MMInit() {
 	if (_MMboot == 1)
@@ -107,6 +377,9 @@ void MMInit() {
 	_MMstate.numberOfRootFolders = 0;
 	_MMstate.current_file_index = 0;
 	_MMstate.playerState = MMStartUp;
+	_MMstate.song.trackIdx = 0xffffffFe;
+	musicDb.category[DB_CAT_PLAYLIST] = 1;
+	musicDb.category[DB_CAT_TRACK] = 20;
 
 	xprintf("Mounting FS \n");
 
@@ -118,9 +391,11 @@ void MMInit() {
 		};
 	}
 //init codec stufs (like buffers)
-	WavInit();
+	WavInit(&_MMstate.song);
 
 	xprintf("Starting Music Manager\n");
+
+	runIndexer();
 
 }
 
@@ -136,7 +411,7 @@ void MMOpenFile() {
 
 const char* MMGetCurrentFilePath() {
 	static char path[7 + MAX_FILE_PATH_LENGTH + 1];
-	//snprintf(path, sizeof(path), "0:/%s", files.files[current_file_index]);
+//snprintf(path, sizeof(path), "0:/%s", files.files[current_file_index]);
 	path[0] = '0';
 	path[1] = ':';
 	path[2] = '/';
@@ -146,7 +421,7 @@ const char* MMGetCurrentFilePath() {
 	path[6] = 'O';
 	path[7] = '/';
 
-	for (uint8_t x = 0; x < 51; x++) {
+	for (uint8_t x = 0; x < 21; x++) {
 		uint8_t c = _MMstate.files.files[_MMstate.current_file_index][x];
 		if (c != '\0' && c != '\n') {
 			path[8 + x] = c;
@@ -160,7 +435,7 @@ const char* MMGetCurrentFilePath() {
 
 void MMPlayBackStateChanged() {
 
-	//notify acc
+//notify acc
 	typeDefTask task;
 	task.f = &taskTrackChanged;
 	task.scheduledAfter = uwTick + 10;
