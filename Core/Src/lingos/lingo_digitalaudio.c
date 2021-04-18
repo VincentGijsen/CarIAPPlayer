@@ -24,8 +24,8 @@ void processLingoDigitalAudio(IAPmsg msg) {
 
 	case 0x00://AccessoryAck
 	{
-		uint8_t b0 = msg.raw[8];
-		uint8_t b1 = msg.raw[9];
+		uint8_t b0 = msg.payload[0];
+		uint8_t b1 = msg.payload[1];
 		xprintf("ACC ack for TrackNewAudioAttributes\n");
 	}
 	break;

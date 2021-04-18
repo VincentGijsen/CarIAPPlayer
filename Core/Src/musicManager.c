@@ -200,6 +200,7 @@ uint8_t runIndexer() {
 	char fName[MAX_DIR_NAME_LEN];
 	uint8_t fnameLen, pLas;
 
+	return;
 	for (uint8_t it = 0; it < MyMusicDB.numOfRootInodes; it++) {
 		uint8_t current[20];
 		uint8_t len=0;

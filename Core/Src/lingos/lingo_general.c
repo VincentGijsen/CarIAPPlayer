@@ -69,8 +69,8 @@ void processLingoGeneral(IAPmsg msg) {
 
 	case 0x39: //SetFIDTokenValues
 	{ //ack with: AckFIDTokenValues 0x03a
-		uint8_t numFIDTokenValues = msg.raw[8];
-		uint8_t tokenStartIdx = 9;
+		uint8_t numFIDTokenValues = msg.payload[0];//msg.raw[8];
+		uint8_t tokenStartIdx = 1;
 		const uint8_t lingogeneric = 0x00;
 		const uint8_t cmdId = 0x3a;
 
@@ -80,10 +80,10 @@ void processLingoGeneral(IAPmsg msg) {
 		addResponsePayload(numFIDTokenValues, 1);
 
 		for (int x = 0; x < numFIDTokenValues; x++) {
-			uint8_t tLeng = msg.raw[tokenStartIdx];
-			uint8_t tFidType = msg.raw[tokenStartIdx + 1];
-			uint8_t tFidSubType = msg.raw[tokenStartIdx + 2];
-			uint8_t tdataStart = msg.raw[tokenStartIdx + 3];
+			uint8_t tLeng = msg.payload[tokenStartIdx];
+			uint8_t tFidType = msg.payload[tokenStartIdx + 1];
+			uint8_t tFidSubType = msg.payload[tokenStartIdx + 2];
+			uint8_t tdataStart = msg.payload[tokenStartIdx + 3];
 
 			if (tFidType == 0x00) {
 				if (tFidSubType == 0x00) {
@@ -93,12 +93,12 @@ void processLingoGeneral(IAPmsg msg) {
 					xprintf("num lingos: %d\n", tdataStart);
 					xprintf("supported lingos: ");
 					for (uint8_t it = 0; it < tdataStart; it++) {
-						xprintf("%d ", msg.raw[tokenStartIdx + 4 + it]);
+						xprintf("%d ", msg.payload[tokenStartIdx + 4 + it]);
 					}
 
-					uint8_t devOptIdx = msg.raw[tokenStartIdx + 3 + tdataStart
+					uint8_t devOptIdx = msg.payload[tokenStartIdx + 3 + tdataStart
 							+ 4];
-					xprintf("device options: %b\n", +msg.raw[devOptIdx]);
+					xprintf("device options: %b\n", +msg.payload[devOptIdx]);
 
 				} else if (tFidSubType == 0x01) {
 					xprintf("AccessoryCapsToken:\n");
@@ -120,7 +120,7 @@ void processLingoGeneral(IAPmsg msg) {
 						xprintf("name: ");
 						uint8_t idx = 1;
 						while (idx) {
-							char c = msg.raw[tokenStartIdx + 3 + idx];
+							char c = msg.payload[tokenStartIdx + 3 + idx];
 							xprintf("%c", c);
 							if (c == '\0')
 								break;
@@ -129,15 +129,15 @@ void processLingoGeneral(IAPmsg msg) {
 
 					}
 					if (tdataStart == 0x04) {
-						xprintf("FW: %x %x %x ", msg.raw[tokenStartIdx + 3 + 1],
-								msg.raw[tokenStartIdx + 3 + 2],
-								msg.raw[tokenStartIdx + 3 + 3]);
+						xprintf("FW: %x %x %x ", msg.payload[tokenStartIdx + 3 + 1],
+								msg.payload[tokenStartIdx + 3 + 2],
+								msg.payload[tokenStartIdx + 3 + 3]);
 					}
 					if (tdataStart == 0x06) {
 						xprintf("Manufact: ");
 						uint8_t idx = 1;
 						while (idx) {
-							char c = msg.raw[tokenStartIdx + 3 + idx];
+							char c = msg.payload[tokenStartIdx + 3 + idx];
 							xprintf("%c", c);
 							if (c == '\0')
 								break;
@@ -202,7 +202,7 @@ void processLingoGeneral(IAPmsg msg) {
 	{
 		//GetiPodOptionsForLingo
 		const uint8_t RetiPodOptionsForLingoCmd = 0x4c;
-		uint8_t reqestedLingoOpts = msg.raw[8];
+		uint8_t reqestedLingoOpts = msg.payload[0];
 		uint8_t pkg_len = 14;
 		uint8_t caps[9] = { 0 };
 		caps[0] = reqestedLingoOpts;
@@ -236,7 +236,7 @@ void processLingoGeneral(IAPmsg msg) {
 	case 0x3b: //EndIDPS
 
 	{
-		uint8_t accEndIDPSStatus = msg.raw[8];
+		uint8_t accEndIDPSStatus = msg.payload[0];
 		switch (accEndIDPSStatus) {
 		case 0x00: {
 			//ok, continue
@@ -273,11 +273,11 @@ void processLingoGeneral(IAPmsg msg) {
 
 		//xprintf("accc provided auth info\n");
 
-		if (msg.raw[8] == 0x02 && msg.raw[9] == 0x00) {
+		if (msg.payload[0] == 0x02 && msg.payload[1] == 0x00) {
 			//xprintf("Acc uses authentication 2.0\n");
 			//iap 2 auth system
-			uint8_t certCurSect = msg.raw[10];
-			uint8_t certMaxSect = msg.raw[11];
+			uint8_t certCurSect = msg.payload[2];
+			uint8_t certMaxSect = msg.payload[3];
 
 			if (certCurSect < certMaxSect) {
 				xprintf("got partical cert: %d/%d \n", certCurSect,

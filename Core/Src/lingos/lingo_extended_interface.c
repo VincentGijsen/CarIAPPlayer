@@ -39,10 +39,10 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x0c: //GetIndexedPlayingTrackInfo
 	{
-		uint8_t trackInfoType = msg.raw[9];
-		uint32_t trackIdx = (msg.raw[10] << 24) | (msg.raw[11] << 16)
-				| (msg.raw[12] << 8) | (msg.raw[13]);
-		uint16_t chapter = (msg.raw[14] << 8) | (msg.raw[15]);
+		uint8_t trackInfoType = msg.payload[0];
+		uint32_t trackIdx = (msg.payload[1] << 24) | (msg.payload[2] << 16)
+				| (msg.payload[3] << 8) | (msg.payload[4]);
+		uint16_t chapter = (msg.payload[5] << 8) | (msg.payload[6]);
 
 		const uint8_t ReturnIndexedPlayingTrackInfo = 0xd;
 		initResponse(LingoExtended, ReturnIndexedPlayingTrackInfo, msg.transID);
@@ -126,9 +126,9 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x17: //SelectDBRecord
 	{
 		xprintf("selectDBRecords \n");
-		uint8_t dbCategoryRequested = msg.raw[9];
-		int32_t dbRecordIdx = (msg.raw[10] << 24) | (msg.raw[11] << 16)
-				| (msg.raw[12] << 8) | (msg.raw[13]);
+		uint8_t dbCategoryRequested = msg.payload[0];
+		int32_t dbRecordIdx = (msg.payload[1] << 24) | (msg.payload[2] << 16)
+				| (msg.payload[3] << 8) | (msg.payload[4]);
 
 		MMSelectItem(dbCategoryRequested, dbRecordIdx);
 		//acc selected record
@@ -143,7 +143,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x18: //GetNumberCategorizedDBRecords
 	{
-		uint8_t catReq = msg.raw[9];
+		uint8_t catReq = msg.payload[0];
 		xprintf("GetNumberCategorizedDBRecords requested category: %d\n",
 				catReq);
 
@@ -177,11 +177,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x1a: //RetrieveCategorizedDatabaseRecords
 	{
-		uint8_t dbCatType = msg.raw[9];
-		uint32_t dbRecordStart = (msg.raw[10] << 24) | (msg.raw[11] << 16)
-				| (msg.raw[12] << 8) | (msg.raw[13]);
-		uint32_t dbRecordCount = (msg.raw[14] << 24) | (msg.raw[15] << 16)
-				| (msg.raw[16] << 8) | (msg.raw[17]);
+		uint8_t dbCatType = msg.payload[0];
+		uint32_t dbRecordStart = (msg.payload[1] << 24) | (msg.payload[2] << 16)
+				| (msg.payload[3] << 8) | (msg.payload[4]);
+
+		uint32_t dbRecordCount = (msg.payload[5] << 24) | (msg.payload[6] << 16)
+				| (msg.payload[7] << 8) | (msg.payload[8]);
 
 		open_query.type = dbCatType;
 		open_query.start = dbRecordStart;
@@ -222,7 +223,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x3b: //ResetDBSelectionHierarchy
 	{
-		if (msg.raw[9] == 0x01) {
+		if (msg.payload[0] == 0x01) {
 			//req for audio db
 		} else {
 			//reg for video-db
@@ -259,7 +260,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x29: //PlayControl
 	{
-		uint8_t playCMD = msg.raw[9];
+		uint8_t playCMD = msg.payload[0];
 		playbackStatus.lastReceivedCommand = playCMD;
 		playbackStatus.lastTransactionId = msg.transID;
 
@@ -300,15 +301,15 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x31: //Set Repeat
 	{
-		uint8_t newRepeateState = msg.raw[9];
-		uint8_t setOnRestore = msg.raw[10];
+		uint8_t newRepeateState = msg.payload[0];
+		uint8_t setOnRestore = msg.payload[1];
 	}
 		break;
 
 	case 0x2e: //SetShuffle
 	{
-		uint8_t newShuffleState = msg.raw[9];
-		uint8_t setOnRestore = msg.raw[10];
+		uint8_t newShuffleState = msg.payload[0];
+		uint8_t setOnRestore = msg.payload[1];
 
 	}
 		break;
