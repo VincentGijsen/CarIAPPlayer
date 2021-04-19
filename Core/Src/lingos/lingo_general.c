@@ -187,8 +187,8 @@ void processLingoGeneral(IAPmsg msg) {
 		uint8_t pkg_len = 6; //lingo, cmd, 2(trans) payload(2),
 		uint8_t lingo = 0; //general
 		uint8_t cmd = 0x12; //ipod ack
-		uint8_t maxHi = (500u >> 8) & 0xff; //success
-		uint8_t maxLo = (500 & 0xff); //origCmdID?
+		uint8_t maxHi = (128 >> 8) & 0xff; //success
+		uint8_t maxLo = (128 & 0xff); //origCmdID?
 
 		uint8_t pl[2] = { maxHi, maxLo };
 		initResponse(lingo, cmd, msg.transID);

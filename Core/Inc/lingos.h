@@ -32,10 +32,10 @@ typedef struct {
 	uint16_t lingoID; //inbound lingo id
 	uint16_t commandId; //inbound command id
 	uint16_t transID; //inbound transaction ID of acc
-	uint8_t nextWrite; // points to payload position witin payload copy
+	uint16_t nextWrite; // points to payload position witin payload copy
 	uint8_t crcProvided; //inbound crc from acc
 	int8_t crcCalc; //used to calc inflight crc
-	uint8_t remainingPayLoadSize; //bytes of actual payload stufs
+	uint16_t remainingPayLoadSize; //bytes of actual payload stufs
 	uint8_t offset;//offset due to muti-byte span of leng/cmd
 
 } IAPmsg;
