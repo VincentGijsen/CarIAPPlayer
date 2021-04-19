@@ -93,6 +93,9 @@ void processLingoExtendedInterface(IAPmsg msg) {
 			addResponsePayload(&empty, sizeof(empty));
 
 		}
+		break;
+		default:
+			xprintf("unshore how to proceed\n");
 		}
 
 		transmitToAcc();
@@ -312,8 +315,6 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		uint8_t setOnRestore = msg.payload[1];
 
 	}
-		break;
-
 		break;
 
 	case 0x2f: //GetRepeat

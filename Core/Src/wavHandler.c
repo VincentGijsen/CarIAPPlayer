@@ -56,7 +56,7 @@ void WavPlayFile() {
 	FRESULT res = f_open(&SDFile, MMGetCurrentFilePath(), FA_READ);
 
 	if (res != FR_OK)
-			return 1;
+			return;// 1;
 
 	/*
 	 * read header
@@ -66,7 +66,7 @@ void WavPlayFile() {
 
 	res = f_read(&SDFile, &head, sizeof head, &a);
 	if (res != FR_OK)
-		return 1;
+		return;// 1;
 
 	//initBuffer();
 	_wavPlayerState.isPLaying = 1;
@@ -77,7 +77,7 @@ void WavPlayFile() {
 	_songDetails->timePositionMs=0;
 
 	if (head.data_id[0] != 'L')
-		return 1;
+		return;// 1;
 
 	while (read[0] != 'd') {
 		f_read(&SDFile, read, sizeof read, &a);

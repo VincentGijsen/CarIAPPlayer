@@ -47,6 +47,44 @@ void processLingoGeneral(IAPmsg msg) {
 	}
 		break;
 
+	case 0x0f: //	RequestLingoProtocolVersion
+	{
+		uint8_t requested_lingo_version = msg.payload[0];
+		xprintf("requested lingo version for : %x\n", requested_lingo_version);
+
+		uint8_t pL[3] = { requested_lingo_version, 0, 0 };
+
+		switch (requested_lingo_version) {
+		case 0x00: //general
+		pL[1] = 1;
+		pL[2] = 9;
+		break;
+
+	case 0x03: //display remote
+		pL[1] = 1;
+		pL[2] = 0;
+		break;
+
+	case 0x04: //extended lingo
+		pL[1] = 1;
+		pL[2] = 14;
+		break;
+
+	case 0x10: //digital audio
+		pL[1] = 1;
+		pL[2] = 2;
+		break;
+
+	default:
+		xprintf("unimplemented lingo-version-req");
+		}
+
+		addResponsePayload(&pL, sizeof(pL));
+		transmitToAcc();
+
+	}
+		break;
+
 	case 0x38: { //startDS
 		//p252 MFiAccessoryFirmwareSpecificationR46NoRestriction.
 		//STARTIPS process stap
@@ -69,7 +107,7 @@ void processLingoGeneral(IAPmsg msg) {
 
 	case 0x39: //SetFIDTokenValues
 	{ //ack with: AckFIDTokenValues 0x03a
-		uint8_t numFIDTokenValues = msg.payload[0];//msg.raw[8];
+		uint8_t numFIDTokenValues = msg.payload[0]; //msg.raw[8];
 		uint8_t tokenStartIdx = 1;
 		const uint8_t lingogeneric = 0x00;
 		const uint8_t cmdId = 0x3a;
@@ -96,8 +134,8 @@ void processLingoGeneral(IAPmsg msg) {
 						xprintf("%d ", msg.payload[tokenStartIdx + 4 + it]);
 					}
 
-					uint8_t devOptIdx = msg.payload[tokenStartIdx + 3 + tdataStart
-							+ 4];
+					uint8_t devOptIdx = msg.payload[tokenStartIdx + 3
+							+ tdataStart + 4];
 					xprintf("device options: %b\n", +msg.payload[devOptIdx]);
 
 				} else if (tFidSubType == 0x01) {
@@ -129,7 +167,8 @@ void processLingoGeneral(IAPmsg msg) {
 
 					}
 					if (tdataStart == 0x04) {
-						xprintf("FW: %x %x %x ", msg.payload[tokenStartIdx + 3 + 1],
+						xprintf("FW: %x %x %x ",
+								msg.payload[tokenStartIdx + 3 + 1],
 								msg.payload[tokenStartIdx + 3 + 2],
 								msg.payload[tokenStartIdx + 3 + 3]);
 					}

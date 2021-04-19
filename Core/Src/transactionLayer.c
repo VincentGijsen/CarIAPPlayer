@@ -59,10 +59,10 @@ typedef struct {
  ReportDef{ID: 0x09, Len: 63, Dir: ReportDirAccIn},
  */
 
-static typeDefTransportStatus _transStatus = INIT;
-static typedefTransportState _transState;
+//static typeDefTransportStatus _transStatus = INIT;
+//static typedefTransportState _transState;
 
-uint8_t calcCRC(uint8_t *b, uint8_t len) {
+/*uint8_t calcCRC(uint8_t *b, uint8_t len) {
 	//checksum check
 	int8_t checksum_calc = 0;
 	//int8_t checksum_calc = length + lingoID + commandID + transID;
@@ -73,7 +73,7 @@ uint8_t calcCRC(uint8_t *b, uint8_t len) {
 	}
 	checksum_calc = -checksum_calc;
 	return checksum_calc;
-}
+}*/
 
 MsgStore store;
 
@@ -133,19 +133,19 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				//length check
 				if (usbPkg[CMD_PKG_LEN] == 0x00) {
 					//3byte pkg length
-					length = usbPkg[CMD_PKG_LEN + 1] << 8;
-					length += usbPkg[CMD_PKG_LEN + 2];
-					offset += 2;
+					length = (uint16_t) (usbPkg[CMD_PKG_LEN + 1] << 8);
+					length += (uint16_t)usbPkg[CMD_PKG_LEN + 2];
+					offset += 2u;
 					extraBytes = 3;
-					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN ];
+					store.msg[x].crcCalc +=(int8_t) usbPkg[CMD_PKG_LEN ];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN + 1];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN + 2];
 
 				} else { //small package <252
-					length = usbPkg[CMD_PKG_LEN];
+					length = (uint16_t) usbPkg[CMD_PKG_LEN];
 					offset += 0;
 					extraBytes = 1;
-					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN];
+					store.msg[x].crcCalc += (int8_t)(usbPkg[CMD_PKG_LEN]);
 				}
 
 				//add extra bytes [hid +linkbyte +start + first_len_byte
@@ -155,14 +155,14 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_LINGO_ID + offset];
 
 				if (lingoID == 0x04) { //in extended mode, the commands are two bytes :(
-					commandID = ((usbPkg[CMD_PKG_COMMAND_ID + offset]) << 8);
-					commandID += (usbPkg[CMD_PKG_COMMAND_ID + 1 + offset]);
+					commandID = (uint16_t)((usbPkg[CMD_PKG_COMMAND_ID + offset]) << 8);
+					commandID += (uint16_t)(usbPkg[CMD_PKG_COMMAND_ID + 1 + offset]);
 
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_COMMAND_ID + offset];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_COMMAND_ID + 1
 							+ offset];
 
-					offset += 1;
+					offset += 1u;
 				} else {
 					//commandID checks
 					commandID = usbPkg[CMD_PKG_COMMAND_ID + offset];
@@ -178,8 +178,8 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 
 				//todo: offset checks for part
 
-				transID = (usbPkg[CMD_PKG_TRANSACTION_ID + offset] << 8);
-				transID += usbPkg[CMD_PKG_TRANSACTION_ID + 1 + offset];
+				transID = (uint16_t) (usbPkg[CMD_PKG_TRANSACTION_ID + offset] << 8);
+				transID += (uint16_t) usbPkg[CMD_PKG_TRANSACTION_ID + 1 + offset];
 
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_TRANSACTION_ID + offset];
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_TRANSACTION_ID + 1
@@ -190,7 +190,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				store.msg[x].commandId = commandID;
 				store.msg[x].transID = transID;
 				store.msg[x].length = length;
-				store.msg[x].remainingPayLoadSize = (length - 4 ); //carefull, remove offset; as we shift right
+				store.msg[x].remainingPayLoadSize = (uint16_t)(length - 4 ); //carefull, remove offset; as we shift right
 				store.msg[x].offset = offset;
 				store.msg[x].nextWrite = 0;
 
