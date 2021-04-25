@@ -11,8 +11,8 @@
 #include "xprintf.h"
 
 #define ENABLE_LOG
-#define ENABLE_DEBUG
-#define ENABLE_TRACE
+//#define ENABLE_DEBUG
+//#define ENABLE_TRACE
 
 #ifdef ENABLE_LOG
   #define LOG xprintf

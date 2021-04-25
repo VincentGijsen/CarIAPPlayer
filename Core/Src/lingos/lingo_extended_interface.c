@@ -33,6 +33,13 @@ struct {
 	uint16_t lastTransactionId;
 } playbackStatus;
 
+/*
+ * pass in first byte as point, to get index back
+ */
+uint32_t _getIndexFromData(uint8_t *data) {
+	return (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | (data[3]);
+}
+
 void processLingoExtendedInterface(IAPmsg msg) {
 
 	switch (msg.commandId) {
@@ -40,8 +47,8 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x0c: //GetIndexedPlayingTrackInfo
 	{
 		uint8_t trackInfoType = msg.payload[0];
-		uint32_t trackIdx = (msg.payload[1] << 24) | (msg.payload[2] << 16)
-				| (msg.payload[3] << 8) | (msg.payload[4]);
+		uint32_t trackIdx = _getIndexFromData(&(msg.payload[1]));
+
 		uint16_t chapter = (msg.payload[5] << 8) | (msg.payload[6]);
 
 		const uint8_t ReturnIndexedPlayingTrackInfo = 0xd;
@@ -57,20 +64,26 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		switch (trackInfoType) {
 		case 0x00: //capabilities
 		{
-			payload[4] =
-					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 24);
+			payload[0] = trackInfoType;
+			payload[1] = 0;
+			payload[2] = 0;
+			payload[3] = 0;
+			payload[4] = 0;
 			payload[5] =
-					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 16);
+					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 24);
 			payload[6] =
+					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 16);
+			payload[7] =
 					(MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 8);
-			payload[7] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs
+			payload[8] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs
 					& 0x00);
-			sendLengthPayload = 10;
+			payload[9] =0;
+			payload[10] = 0;
+			sendLengthPayload = 11;
 			addResponsePayload(&payload, sizeof(sendLengthPayload));
 		}
-		case 0x01: //podcastname
-		case 0x02: //track release date
-		case 0x05: //track genre
+			break;
+
 		case 0x06: // trac composer
 		{
 			uint8_t empty[2] = { trackInfoType, 0 };
@@ -86,7 +99,6 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		}
 			break;
 
-		case 0x03: //description
 		case 0x04: //lyrics
 		{
 			uint8_t empty[5] = { 0 };
@@ -94,6 +106,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 		}
 			break;
+
+		case 0x01: //podcastname
+		case 0x02: //track release date
+		case 0x05: //track genre
+
+		case 0x03: //description
 
 		default:
 			LOG("unsure how to proceed\n");
@@ -105,6 +123,13 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x0e: //GetArtworkFormats
 	{
+		const uint8_t RetArtworkFormats = 0x0f;
+		initResponse(LingoExtended, RetArtworkFormats, msg.transID);
+		const uint8_t pixel_format = 0x02;
+		uint8_t artwork[] = { 0, 1, pixel_format, 0, 16, 0, 16 };
+		addResponsePayload(&artwork, sizeof(artwork));
+		transmitToAcc();
+
 		LOG("GetArtWorkFormats to be implemented\n");
 	}
 		break;
@@ -131,9 +156,10 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	{
 		LOG("selectDBRecords \n");
 		uint8_t dbCategoryRequested = msg.payload[0];
-		int32_t dbRecordIdx = (msg.payload[1] << 24) | (msg.payload[2] << 16)
-				| (msg.payload[3] << 8) | (msg.payload[4]);
-
+		int32_t dbRecordIdx = _getIndexFromData(&(msg.payload[1]));
+		/*(msg.payload[1] << 24) | (msg.payload[2] << 16)
+		 | (msg.payload[3] << 8) | (msg.payload[4]);
+		 */
 		MMSelectItem(dbCategoryRequested, dbRecordIdx);
 		//acc selected record
 		const cmdToAck = 0x17;
@@ -183,11 +209,9 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x1a: //RetrieveCategorizedDatabaseRecords
 	{
 		uint8_t dbCatType = msg.payload[0];
-		uint32_t dbRecordStart = (msg.payload[1] << 24) | (msg.payload[2] << 16)
-				| (msg.payload[3] << 8) | (msg.payload[4]);
+		uint32_t dbRecordStart = _getIndexFromData(&(msg.payload[1]));
 
-		uint32_t dbRecordCount = (msg.payload[5] << 24) | (msg.payload[6] << 16)
-				| (msg.payload[7] << 8) | (msg.payload[8]);
+		uint32_t dbRecordCount = _getIndexFromData(&(msg.payload[5]));
 
 		open_query.type = dbCatType;
 		open_query.start = dbRecordStart;
@@ -220,10 +244,13 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		res[7] = (MMgetSongDetailsOfCurrent()->timePositionMs & 0xff);
 
 		//todo: get from MusicManager
-		const uint8_t isPlaying = 0x01;
+		//const uint8_t isPlaying = 0x01;
 
-		res[8] = (isPlaying);
-
+		if (!MMIsPaused())
+			res[8] = (MMIsPlaying() << 0) | (MMisStopped() << 2);
+		else {
+			res[8] = 0; //paused
+		}
 		addResponsePayload(&res, sizeof(res));
 		transmitToAcc();
 
@@ -237,16 +264,19 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		initResponse(LingoExtended, ReturnCurrentPlayingTrackIndexCmd,
 				msg.transID);
 
-		uint8_t res[4] = { 0xFf, 0xff, 0xff, 0xff };
+		uint8_t res[4] = { 0xFf, 0xff, 0xff, 0xff }; //initialize as 'nothing is playing'
 
-		if (playbackStatus.playingOrPause) {
+		if (MMIsPaused() || MMIsPlaying()) {
 			res[0] = (MMgetSongDetailsOfCurrent()->trackIdx >> 24);
 			res[1] = (MMgetSongDetailsOfCurrent()->trackIdx >> 16);
 			res[2] = (MMgetSongDetailsOfCurrent()->trackIdx >> 8);
 			res[3] = (MMgetSongDetailsOfCurrent()->trackIdx & 0xff);
+			LOG("track IDX %d playing/paused \n",
+					MMgetSongDetailsOfCurrent()->trackIdx);
 
 		} else {
 			//init value is correct for stopped state
+			//default init implements -1 (signed)
 		}
 
 		addResponsePayload(&res, sizeof(res));
@@ -256,10 +286,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x22: //GetIndexedTrackArtistName
 	{
+		LOG("GetIndexedTrackArtistName\n");
 		const uint8_t ReturnIndexedPlayingTrackArtistName = 0x23;
-		uint16_t reqItemIdx = msg.payload[0] << 24 | msg.payload[1] << 16
-				| msg.payload[3] << 8 | msg.payload[3];
-
+		uint16_t reqItemIdx = _getIndexFromData(&(msg.payload[0]));
+		/*msg.payload[0] << 24 | msg.payload[1] << 16
+		 | msg.payload[3] << 8 | msg.payload[3];
+		 */
 		//assume alsways ok;
 		initResponse(LingoExtended, ReturnIndexedPlayingTrackArtistName,
 				msg.transID);
@@ -273,9 +305,11 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x24: //GetIndexedTrackAlbumName
 	{
+		LOG("GetIndexedTrackAlbumName\n");
 		const uint8_t ReturnIndexedPlayingAlbumName = 0x25;
-		uint16_t reqItemIdx = msg.payload[0] << 24 | msg.payload[1] << 16
-				| msg.payload[3] << 8 | msg.payload[3];
+		uint16_t reqItemIdx = _getIndexFromData(&(msg.payload[0]));/*msg.payload[0] << 24 | msg.payload[1] << 16
+		 | msg.payload[3] << 8 | msg.payload[3];
+		 */
 
 		//assume alsways ok;
 		initResponse(LingoExtended, ReturnIndexedPlayingAlbumName, msg.transID);
@@ -305,7 +339,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	{
 		const cmdToAck = 0x28;
 		const uint8_t success = { 0x00, 0x00, cmdToAck };
-		LOG("Play current Selection..\n");
+
+		uint32_t idx = _getIndexFromData(&(msg.payload[0]));
+
+		//set PLaying track:
+
+		LOG("Play current Selection..idx: %d\n", idx);
 		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
 		initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
 		addResponsePayload(&success, sizeof(success));
@@ -519,7 +558,7 @@ void taskProcessQuery() {
 			LOG("query cat type not implemented \n");
 			return;
 		}
-		LOG("sending record\n");
+		//LOG("sending record\n");
 		addResponsePayload(&db_record_to_send, sizeof(db_record_to_send));
 		transmitToAcc();
 

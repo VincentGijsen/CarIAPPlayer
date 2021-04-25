@@ -242,10 +242,10 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 					//uint8_t it = 0;
 					uint8_t it = CMD_PKG_PAYLOAD_BYTE0_IF_SET+ store.msg[x].offset; //will fit due to small package
 
-					uint8_t dataStartingAt = CMD_PKG_PAYLOAD_BYTE0_IF_SET
-							+ offset;
-					while (store.msg[x].remainingPayLoadSize > 0
-							&& (it) < usbPkgLen) {
+					//uint8_t dataStartingAt = CMD_PKG_PAYLOAD_BYTE0_IF_SET
+					//		+ offset;
+					while (/*store.msg[x].remainingPayLoadSize > 0
+							&& */(it) < usbPkgLen) {
 
 						//uint8_t b = usbPkg[dataStartingAt + it];
 						uint8_t b = usbPkg[ it];

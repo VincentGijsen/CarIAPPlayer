@@ -95,10 +95,16 @@ SongDetails* MMgetSongDetailsOfCurrent();
 tMusicDB* MMgetMusicDB();
 uint8_t MMgetNumberOfPLaylists();
 uint8_t MMgetNumberOfTracks();
-void MMgetPlaylistItem(uint8_t idx, char *content, uint8_t *len);
-void MMgetTracklistItem(uint8_t idx, char *content, uint8_t *len);
+void MMgetPlaylistItem(uint32_t idx, char *content, uint8_t *len);
+void MMgetTracklistItem(uint32_t idx, char *content, uint8_t *len);
 void MMSelectItem(uint8_t category, uint32_t item);
 void MMResetSelections();
+
+
+uint8_t MMIsPaused();
+uint8_t MMisStopped();
+uint8_t MMIsPlaying();
+
 /*
  * logic for musicmanager
  */
