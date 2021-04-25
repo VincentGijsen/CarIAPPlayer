@@ -52,6 +52,7 @@ void processLingoGeneral(IAPmsg msg) {
 		uint8_t requested_lingo_version = msg.payload[0];
 		LOG("requested lingo version for : %x\n", requested_lingo_version);
 
+		const uint8_t returnLingoProtocolVersion = 0x10;
 		uint8_t pL[3] = { requested_lingo_version, 0, 0 };
 
 		switch (requested_lingo_version) {
@@ -79,6 +80,8 @@ void processLingoGeneral(IAPmsg msg) {
 			LOG("unimplemented lingo-version-req");
 		}
 
+		LOG("providing LINGO INFO\n");
+		initResponse(LingoGeneral, returnLingoProtocolVersion, msg.transID);
 		addResponsePayload(&pL, sizeof(pL));
 		transmitToAcc();
 
@@ -320,8 +323,7 @@ void processLingoGeneral(IAPmsg msg) {
 			uint8_t certMaxSect = msg.payload[3];
 
 			if (certCurSect < certMaxSect) {
-				DEBUG("got partical cert: %d/%d \n", certCurSect,
-						certMaxSect);
+				DEBUG("got partical cert: %d/%d \n", certCurSect, certMaxSect);
 				//ack for next run, else proceed
 				const uint8_t cmdstatus = 0x00; //success
 				const uint8_t origCmdID = 0x15; //origCmdID?
@@ -354,7 +356,8 @@ void processLingoGeneral(IAPmsg msg) {
 				 podTransactionCounter);
 
 				 transmitToAcc();*/
-#ifdef FALSE
+#define ENABLED 		1
+#if ENABLED
 				for (uint8_t x = 0; x < 254; x++) {
 					for (uint8_t y = 0; y < 254; y++) {
 						asm("nop");

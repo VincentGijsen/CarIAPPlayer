@@ -194,19 +194,18 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				store.msg[x].commandId = commandID;
 				store.msg[x].transID = transID;
 				store.msg[x].length = length;
-				store.msg[x].remainingPayLoadSize = ((length - 4) - 0);//offset); //carefull, remove offset; as we shift right
+				store.msg[x].remainingPayLoadSize = ((length - 4) - offset); //carefull, remove offset; as we shift right
 				store.msg[x].offset = offset;
 				store.msg[x].nextWrite = 0;
 
 				if (usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_DONE) {
 					//only copy sthufs for a 'small/single pkg'
-					uint8_t it = 0; //will fit due to small package
+					uint8_t it = CMD_PKG_PAYLOAD_BYTE0_IF_SET+ store.msg[x].offset; //will fit due to small package
 					uint8_t crcIdxoffset = store.msg[x].remainingPayLoadSize
 							+ offset;
 					while (store.msg[x].remainingPayLoadSize > 0) {
 
-						uint8_t b = usbPkg[CMD_PKG_PAYLOAD_BYTE0_IF_SET + offset
-								+ it];
+						uint8_t b = usbPkg[ it];
 						store.msg[x].payload[store.msg[x].nextWrite] = b;
 						store.msg[x].crcCalc += b;
 						store.msg[x].nextWrite++;
@@ -217,8 +216,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 					//final checksum step:
 					store.msg[x].crcCalc = -store.msg[x].crcCalc;
 					//next_write should point to crc (last byte)
-					uint8_t checksum = usbPkg[CMD_PKG_PAYLOAD_BYTE0_IF_SET
-							+ crcIdxoffset]; //includes any offsets after length idx
+					uint8_t checksum = usbPkg[it]; //includes any offsets after length idx
 					//uint8_t checksum_val = calcCRC(&usbPkg[CMD_PKG_LEN],
 					//(length + extraBytes));
 
@@ -241,13 +239,16 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 					 * HID_LINKCTRL_MORE_TO_FOLLOW
 					 */
 
-					uint8_t it = 0;
+					//uint8_t it = 0;
+					uint8_t it = CMD_PKG_PAYLOAD_BYTE0_IF_SET+ store.msg[x].offset; //will fit due to small package
+
 					uint8_t dataStartingAt = CMD_PKG_PAYLOAD_BYTE0_IF_SET
 							+ offset;
 					while (store.msg[x].remainingPayLoadSize > 0
-							&& (it + dataStartingAt) < usbPkgLen) {
+							&& (it) < usbPkgLen) {
 
-						uint8_t b = usbPkg[dataStartingAt + it];
+						//uint8_t b = usbPkg[dataStartingAt + it];
+						uint8_t b = usbPkg[ it];
 
 						store.msg[x].payload[store.msg[x].nextWrite] = b;
 						store.msg[x].crcCalc += b;

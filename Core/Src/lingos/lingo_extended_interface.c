@@ -148,8 +148,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x18: //GetNumberCategorizedDBRecords
 	{
 		uint8_t catReq = msg.payload[0];
-		LOG("GetNumberCategorizedDBRecords cat: %d\n",
-				catReq);
+		LOG("GetNumberCategorizedDBRecords cat: %d\n", catReq);
 
 		const uint8_t returnNumberCategorizedDBRecordsCmd = 0x19;
 		initResponse(LingoExtended, returnNumberCategorizedDBRecordsCmd,
@@ -164,7 +163,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 			break;
 
 		case DB_CAT_TRACK:
-			numberOfTracks=MMgetNumberOfTracks();
+			numberOfTracks = MMgetNumberOfTracks();
 		default:
 			//to implement
 			;
@@ -193,13 +192,41 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		open_query.type = dbCatType;
 		open_query.start = dbRecordStart;
 		open_query.count = dbRecordCount;
-		LOG("requested record type: %d | s: %d | cnt: %d\n",
-				dbCatType, dbRecordStart, dbRecordCount);
+		LOG("requested record type: %d | s: %d | cnt: %d\n", dbCatType,
+				dbRecordStart, dbRecordCount);
 
 		typeDefTask task;
 		task.f = &taskProcessQuery;
 		task.scheduledAfter = uwTick + 10;
 		scheduleTasks(task);
+	}
+		break;
+
+	case 0x1C: //GetPlayStatus
+	{
+		LOG("Get play status\n");
+		const uint8_t ReturnPlayStatus = 0x1d;
+		initResponse(LingoExtended, ReturnPlayStatus, msg.transID);
+
+		uint8_t res[9]; // = { 0xFf, 0xff, 0xff, 0xff };
+		res[0] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 24);
+		res[1] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 16);
+		res[2] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs >> 8);
+		res[3] = (MMgetSongDetailsOfCurrent()->timeDurationTotalMs & 0xff);
+
+		res[4] = (MMgetSongDetailsOfCurrent()->timePositionMs >> 24);
+		res[5] = (MMgetSongDetailsOfCurrent()->timePositionMs >> 16);
+		res[6] = (MMgetSongDetailsOfCurrent()->timePositionMs >> 8);
+		res[7] = (MMgetSongDetailsOfCurrent()->timePositionMs & 0xff);
+
+		//todo: get from MusicManager
+		const uint8_t isPlaying = 0x01;
+
+		res[8] = (isPlaying);
+
+		addResponsePayload(&res, sizeof(res));
+		transmitToAcc();
+
 	}
 		break;
 
@@ -227,13 +254,36 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	}
 		break;
 
-	case 0x3b: //ResetDBSelectionHierarchy
+	case 0x22: //GetIndexedTrackArtistName
 	{
-		if (msg.payload[0] == 0x01) {
-			//req for audio db
-		} else {
-			//reg for video-db
-		}
+		const uint8_t ReturnIndexedPlayingTrackArtistName = 0x23;
+		uint16_t reqItemIdx = msg.payload[0] << 24 | msg.payload[1] << 16
+				| msg.payload[3] << 8 | msg.payload[3];
+
+		//assume alsways ok;
+		initResponse(LingoExtended, ReturnIndexedPlayingTrackArtistName,
+				msg.transID);
+		//get payload; and 0-termiante
+
+		uint8_t res[] = "TODOArtistName";
+		addResponsePayload(&res, sizeof(res));
+		transmitToAcc();
+	}
+		break;
+
+	case 0x24: //GetIndexedTrackAlbumName
+	{
+		const uint8_t ReturnIndexedPlayingAlbumName = 0x25;
+		uint16_t reqItemIdx = msg.payload[0] << 24 | msg.payload[1] << 16
+				| msg.payload[3] << 8 | msg.payload[3];
+
+		//assume alsways ok;
+		initResponse(LingoExtended, ReturnIndexedPlayingAlbumName, msg.transID);
+		//get payload; and 0-termiante
+
+		uint8_t res[] = "TODOAlbumName";
+		addResponsePayload(&res, sizeof(res));
+		transmitToAcc();
 	}
 		break;
 
@@ -286,6 +336,29 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	}
 		break;
+
+	case 0x2e: //SetShuffle
+	{
+		LOG("set shuffle\n");
+		uint8_t newShuffleState = msg.payload[0];
+		uint8_t setOnRestore = msg.payload[1];
+
+	}
+		break;
+
+	case 0x2f: //GetRepeat
+	{
+		const uint8_t ReturnRepeatCMD = 0x30;
+		const uint8_t repeatTracks = 0x00;
+		LOG("get repeat\n");
+
+		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
+		initResponse(LingoExtended, ReturnRepeatCMD, msg.transID);
+		addResponsePayload(&repeatTracks, sizeof(repeatTracks));
+		transmitToAcc();
+	}
+		break;
+
 	case 0x2c: //GetShuffle
 	{
 		const uint8_t ReturnShuffleCMD = 0x2D;
@@ -313,25 +386,54 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	}
 		break;
 
-	case 0x2e: //SetShuffle
+	case 0x3b: //ResetDBSelectionHierarchy
 	{
-		LOG("set shuffle\n");
-		uint8_t newShuffleState = msg.payload[0];
-		uint8_t setOnRestore = msg.payload[1];
+		LOG("ResetDBSelectionHierarchy \n");
+		LOG("TODO: IMPLEMENT\n");
+		if (msg.payload[0] == 0x01) {
+			//req for audio db
+		} else {
+			//reg for video-db
+		}
+	}
+		break;
+
+	case 0x35: //GetNumPlayingTracks
+	{
+		//view tracks in ithin the 'now playing list'
+		const uint8_t ReturnNumPlayingTracks = 0x36;
+		uint8_t res[4] = { 0xFf, 0xff, 0xff, 0xff };
+
+		LOG("GetNumPlayingTracks\n");
+		LOG("TODO: IMPLEMENT\n");
+		//todo
+		uint8_t static_number_of_songs_queued = 99;
+
+		res[0] = (static_number_of_songs_queued >> 24);
+		res[1] = (static_number_of_songs_queued >> 16);
+		res[2] = (static_number_of_songs_queued >> 8);
+		res[3] = (static_number_of_songs_queued & 0xff);
+
+		initResponse(LingoExtended, ReturnNumPlayingTracks, msg.transID);
+		addResponsePayload(&res, sizeof(res));
+		transmitToAcc();
 
 	}
 		break;
 
-	case 0x2f: //GetRepeat
+	case 0x37: //SetCurrentPlayingTrack
 	{
-		const uint8_t ReturnRepeatCMD = 0x30;
-		const uint8_t repeatTracks = 0x00;
-		LOG("get repeat\n");
+		//jumps into now-playing list;
+		LOG("SetCurrentPlayingTrack\n");
+		LOG("TODO: IMPLEMENT\n");
 
-		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
-		initResponse(LingoExtended, ReturnRepeatCMD, msg.transID);
-		addResponsePayload(&repeatTracks, sizeof(repeatTracks));
+		const cmdToAck = 0x37;
+
+		initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
+		const uint8_t success = { 0x00, 0x00, cmdToAck };
+		addResponsePayload(&success, sizeof(success));
 		transmitToAcc();
+		//return ACK
 	}
 		break;
 
