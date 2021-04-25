@@ -5,7 +5,7 @@
  *      Author: vtjgi
  */
 
-#include "xprintf.h"
+#include "log.h"
 #include <stdint.h>
 #include "transactionlayer.h"
 
@@ -61,19 +61,18 @@ typedef struct {
 
 //static typeDefTransportStatus _transStatus = INIT;
 //static typedefTransportState _transState;
-
 /*uint8_t calcCRC(uint8_t *b, uint8_t len) {
-	//checksum check
-	int8_t checksum_calc = 0;
-	//int8_t checksum_calc = length + lingoID + commandID + transID;
-	//todo: not fully correct for 2-byte cmds!
-	for (uint8_t it = 0; it < len; it++) {
-		//checksum_calc += pkg[(CMD_PKG_TRANSACTION_ID + 2) + offset + it];
-		checksum_calc += b[it];
-	}
-	checksum_calc = -checksum_calc;
-	return checksum_calc;
-}*/
+ //checksum check
+ int8_t checksum_calc = 0;
+ //int8_t checksum_calc = length + lingoID + commandID + transID;
+ //todo: not fully correct for 2-byte cmds!
+ for (uint8_t it = 0; it < len; it++) {
+ //checksum_calc += pkg[(CMD_PKG_TRANSACTION_ID + 2) + offset + it];
+ checksum_calc += b[it];
+ }
+ checksum_calc = -checksum_calc;
+ return checksum_calc;
+ }*/
 
 MsgStore store;
 
@@ -116,7 +115,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 			|| usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_MORE_TO_FOLLOW
 			|| usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_ONLY_DATA)) {
 		//invalid pkg
-		xprintf("invalid package start\n");
+		DEBUG("invalid package start: %02X\n", usbPkg[CMD_PKG_PREAMBLE0]);
 		return;
 
 	}
@@ -134,10 +133,10 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				if (usbPkg[CMD_PKG_LEN] == 0x00) {
 					//3byte pkg length
 					length = (uint16_t) (usbPkg[CMD_PKG_LEN + 1] << 8);
-					length += (uint16_t)usbPkg[CMD_PKG_LEN + 2];
+					length += (uint16_t) usbPkg[CMD_PKG_LEN + 2];
 					offset += 2u;
 					extraBytes = 3;
-					store.msg[x].crcCalc +=(int8_t) usbPkg[CMD_PKG_LEN ];
+					store.msg[x].crcCalc += (int8_t) usbPkg[CMD_PKG_LEN];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN + 1];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_LEN + 2];
 
@@ -145,7 +144,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 					length = (uint16_t) usbPkg[CMD_PKG_LEN];
 					offset += 0;
 					extraBytes = 1;
-					store.msg[x].crcCalc += (int8_t)(usbPkg[CMD_PKG_LEN]);
+					store.msg[x].crcCalc += (int8_t) (usbPkg[CMD_PKG_LEN]);
 				}
 
 				//add extra bytes [hid +linkbyte +start + first_len_byte
@@ -155,8 +154,11 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_LINGO_ID + offset];
 
 				if (lingoID == 0x04) { //in extended mode, the commands are two bytes :(
-					commandID = (uint16_t)((usbPkg[CMD_PKG_COMMAND_ID + offset]) << 8);
-					commandID += (uint16_t)(usbPkg[CMD_PKG_COMMAND_ID + 1 + offset]);
+					commandID =
+							(uint16_t) ((usbPkg[CMD_PKG_COMMAND_ID + offset])
+									<< 8);
+					commandID += (uint16_t) (usbPkg[CMD_PKG_COMMAND_ID + 1
+							+ offset]);
 
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_COMMAND_ID + offset];
 					store.msg[x].crcCalc += usbPkg[CMD_PKG_COMMAND_ID + 1
@@ -173,13 +175,15 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				remaining_copy_bytes = length + offset;
 
 				if (remaining_copy_bytes > (MAX_RAW_SIZE - 2)) {
-					xprintf("Message to big to process!\n");
+					DEBUG("Message to big to process!\n");
 				}
 
 				//todo: offset checks for part
 
-				transID = (uint16_t) (usbPkg[CMD_PKG_TRANSACTION_ID + offset] << 8);
-				transID += (uint16_t) usbPkg[CMD_PKG_TRANSACTION_ID + 1 + offset];
+				transID = (uint16_t) (usbPkg[CMD_PKG_TRANSACTION_ID + offset]
+						<< 8);
+				transID +=
+						(uint16_t) usbPkg[CMD_PKG_TRANSACTION_ID + 1 + offset];
 
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_TRANSACTION_ID + offset];
 				store.msg[x].crcCalc += usbPkg[CMD_PKG_TRANSACTION_ID + 1
@@ -190,14 +194,15 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				store.msg[x].commandId = commandID;
 				store.msg[x].transID = transID;
 				store.msg[x].length = length;
-				store.msg[x].remainingPayLoadSize = (uint16_t)(length - 4 ); //carefull, remove offset; as we shift right
+				store.msg[x].remainingPayLoadSize = ((length - 4) - 0);//offset); //carefull, remove offset; as we shift right
 				store.msg[x].offset = offset;
 				store.msg[x].nextWrite = 0;
 
 				if (usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_DONE) {
 					//only copy sthufs for a 'small/single pkg'
 					uint8_t it = 0; //will fit due to small package
-					uint8_t crcIdxoffset = store.msg[x].remainingPayLoadSize +offset;
+					uint8_t crcIdxoffset = store.msg[x].remainingPayLoadSize
+							+ offset;
 					while (store.msg[x].remainingPayLoadSize > 0) {
 
 						uint8_t b = usbPkg[CMD_PKG_PAYLOAD_BYTE0_IF_SET + offset
@@ -218,8 +223,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 					//(length + extraBytes));
 
 					if (checksum != (uint8_t) (store.msg[x].crcCalc)) {
-						xprintf(
-								"checksum Failed: provided: %X  calculated %X \n",
+						DEBUG("checksum Failed: provided: %X  calculated %X \n",
 								checksum, (uint8_t) store.msg[x].crcCalc);
 						return;
 
@@ -261,41 +265,38 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 			}
 		}
 
-	} else {
-		/*
-		 * Intransit package, so we need to add to a prior one(s)
-		 */
-		if (usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_ONLY_DATA) {
-			//END_OF_PREVIOUS_TRANSFER
-			for (uint8_t x = 0; x < 4; x++) {
-				if (store.set[x] == MORE_DATA_PENDING) { //2 indicates partial entry already
-					//uint8_t startPos = store.msg[x].nextWrite; //nextwRITE FILLED AT PREVIOUS ENTRY
+	} else
+	/*
+	 * Intransit package, so we need to add to a prior one(s)
+	 */
+	if (usbPkg[CMD_PKG_PREAMBLE0] == HID_LINKCTRL_ONLY_DATA) {
+		//END_OF_PREVIOUS_TRANSFER
+		for (uint8_t x = 0; x < 4; x++) {
+			if (store.set[x] == MORE_DATA_PENDING) { //2 indicates partial entry already
+				//uint8_t startPos = store.msg[x].nextWrite; //nextwRITE FILLED AT PREVIOUS ENTRY
 
-					uint8_t it = offsetForHIDIdAndLinkByte;
-					while (store.msg[x].remainingPayLoadSize > 0 && (it  < usbPkgLen)) { //copy whole frame, minus hid-rep and linkbyte
-						uint8_t b = usbPkg[it];
+				uint8_t it = offsetForHIDIdAndLinkByte;
+				while (store.msg[x].remainingPayLoadSize > 0 && (it < usbPkgLen)) { //copy whole frame, minus hid-rep and linkbyte
+					uint8_t b = usbPkg[it];
 
-						store.msg[x].payload[store.msg[x].nextWrite] = b;
-						store.msg[x].crcCalc += b;
+					store.msg[x].payload[store.msg[x].nextWrite] = b;
+					store.msg[x].crcCalc += b;
 
-						store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
-						store.msg[x].remainingPayLoadSize--; //decrement total amount of bytes to copy
-						it++;
+					store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
+					store.msg[x].remainingPayLoadSize--; //decrement total amount of bytes to copy
+					it++;
 
-						if(store.msg[x].payload[0] != 0x02){
-							while (1);
-						}
+					if (store.msg[x].payload[0] != 0x02) {
+						//while (1);
 					}
-
-					return;
-					break;
 				}
-			}
 
+				return;
+				break;
+			}
 		}
 
-	}
-
+	} else
 	/*
 	 * End of (multiple) packages, copy remaining bytes and 'submit'
 	 */
@@ -306,6 +307,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 
 				uint8_t it = offsetForHIDIdAndLinkByte;
 				uint8_t crcIdxoffset = store.msg[x].remainingPayLoadSize;
+				//uint8_t crc_final_pos_after_loop = 0;
 				while (store.msg[x].remainingPayLoadSize > 0) { //copy whole frame, minus hid-rep and linkbyte
 					//store.msg[x].raw[store.msg[x].nextWrite] = usbPkg[it
 					//		+ offSetHidLcb];
@@ -315,6 +317,7 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 
 					store.msg[x].nextWrite++; //increment last write slot in-case 3rd packet comes
 					store.msg[x].remainingPayLoadSize--; //decrement total amount of bytes to copy
+					//crc_final_pos_after_loop++; //updated crc counter to point to crc byte after final run
 					it++;
 				}
 				//update record, make sure its processed further down
@@ -323,13 +326,14 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 				//final checksum step:
 				store.msg[x].crcCalc = -store.msg[x].crcCalc;
 
-				uint8_t checksum = usbPkg[offsetForHIDIdAndLinkByte
-						+ crcIdxoffset]; //includes any offsets after length idx
+				uint8_t checksum = usbPkg[it]; //includes any offsets after length idx
 
 				if (checksum != (uint8_t) (store.msg[x].crcCalc)) {
-					xprintf(
+					DEBUG(
 							"checksum multipkg Failed: provided: %X  calculated %X \n",
 							checksum, (uint8_t) store.msg[x].crcCalc);
+					store.set[x] = EMPTY;
+
 					return;
 
 				}
@@ -342,13 +346,20 @@ void processInbound(uint8_t *usbPkg, uint8_t usbPkgLen) {
 			}
 		}
 
-	}
+	} else {
+		DEBUG("!!! Unexpected package received: ");
+		for (uint8_t x = 0; x < usbPkgLen; x++) {
+			DEBUG("%02x ", usbPkg[x]);
+
+		}
+		DEBUG("\n");
 
 //vieze hack
 //if (commandID == 0x38) {
 //	_transState.lastCmd = INIT;
 ////	_transState.oldestTransActionNumber = transID;
 //}
+	}
 }
 
 //p150MFiAccessoryFirmwareSpecificationR46NoRestriction
@@ -539,7 +550,7 @@ void transmitToAcc() {
 		}
 
 	} else {
-		xprintf("PKG len to big!NOT IMPLEMENTED YET!\n");
+		DEBUG("PKG len to big!NOT IMPLEMENTED YET!\n");
 	}
 }
 
@@ -566,7 +577,7 @@ void processTransport() {
 
 			default:
 				//not implemented
-				xprintf("unimplemented lingo: %x\n", store.msg[x].lingoID);
+				LOG("unimplemented lingo: %x\n", store.msg[x].lingoID);
 				;
 			}
 			//flag as done

@@ -73,6 +73,7 @@ typedef struct {
 	IdxInodes rootInodes[50];
 	uint8_t numOfRootInodes;
 	uint8_t selectedRootInode;
+	uint8_t selectedCategyory; //0-12; 0xff==invalid
 }IdxRepository;
 
 /*

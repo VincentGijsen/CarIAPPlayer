@@ -41,11 +41,15 @@ FRESULT fr;
 static IdxRepository MyMusicDB;
 #define MAX_DIR_NAME_LEN (13+4)
 
+static FILINFO filInfoHandle;
+static DIR dirHandle;
+
 int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
 		uint8_t *pNameLen, uint8_t *pLastDirFoundCnt);
 
-int8_t mmGetFileInDir(uint8_t fileIdx, char *dirPath,
-		uint8_t *pLastFileFoundCnt, uint8_t bUpdateRepo, char *retVal) {
+int8_t mmGetFileInDir(uint8_t fileIdx, uint8_t dirIdx, char *dirPath,
+		uint8_t *pLastFileFoundCnt, uint8_t bUpdateRepo, char *pRetVal,
+		uint8_t *pRetValLen) {
 
 	char path[20];
 	path[0] = '0';
@@ -54,12 +58,12 @@ int8_t mmGetFileInDir(uint8_t fileIdx, char *dirPath,
 
 	uint8_t len = strlen(dirPath);
 	strncpy(&path[3], dirPath, len);
-	path[3+len] = '\0'; //add aditional zero for proper 'string'
+	path[3 + len] = '\0'; //add aditional zero for proper 'string'
 	//by now the path should equal root+dir
-	DIR dir;
+	//DIR dir;
 	FRESULT res;
-	xprintf("opening dir: %s\n", path);
-	res = f_opendir(&dir, path);
+	xprintf("FileFUN: opening dir: %s\n", path);
+	res = f_opendir(&dirHandle, path);
 
 	if (res != FR_OK) {
 		xprintf("Error: mmGetFileInDirectoryByIdxe f_opendir: %s\n", path);
@@ -69,36 +73,43 @@ int8_t mmGetFileInDir(uint8_t fileIdx, char *dirPath,
 	uint8_t searchIdx = 0;
 	while (searchIdx < 254) {
 
-		FILINFO file_info;
-		res = f_readdir(&dir, &file_info);
+		//FILINFO file_info;
+		res = f_readdir(&dirHandle, &filInfoHandle);
 		if (res != FR_OK) {
 			xprintf("Error: f_readdir\n");
 			return -1;
 		}
 
 		//break on end of dir
-		if (file_info.fname[0] == '\0') {
+		if (filInfoHandle.fname[0] == '\0') {
 
 			return -1;
 		}
-		if (!(file_info.fattrib & AM_DIR)) {
+		if (!(filInfoHandle.fattrib & AM_DIR)) {
 
 			*pLastFileFoundCnt = searchIdx;
 
-			xprintf("found file %s \n", file_info.fname);
+			//xprintf("found file %s \n", filInfoHandle.fname);
 
-			uint8_t len = strlen(&file_info.fname);
+			uint8_t len = strlen(&filInfoHandle.fname);
 			if (len >= 5 && len <= MAX_FILE_PATH_LENGTH
-					&& strcmp(&file_info.fname[len - 4], ".WAV") == 0) {
+					&& strcmp(&filInfoHandle.fname[len - 4], ".WAV") == 0) {
 
 				//WE HAVE A PLAYABLE FILE
 				//thisi is the dir # we searched for
-				uint8_t len = strlen(file_info.fname);
-				strncpy(&(retVal), file_info.fname, len);
 
 				//return 1 to indicate we found the requested file
 				//important to check here as wel!!
+				if (bUpdateRepo) {
+					MyMusicDB.rootInodes[dirIdx].numberOfTracks++;
+					MyMusicDB.rootInodes[dirIdx].subDirInodes[searchIdx] = 1;
+				}
 				if (searchIdx == fileIdx) {
+
+					*pRetValLen = strlen(filInfoHandle.fname);
+					strncpy(&(pRetVal[0]), filInfoHandle.fname, *pRetValLen);
+					pRetVal[*pRetValLen] = 0;
+					*pRetValLen += 1;
 
 					return 1;
 				}
@@ -107,18 +118,14 @@ int8_t mmGetFileInDir(uint8_t fileIdx, char *dirPath,
 			else {
 
 			}
-
 		}
 		//return 1 to indicate we found the requested file
 		if (searchIdx == fileIdx) {
-
 			return 1;
 		}
 		searchIdx++;
-
 	};
 	return -1;
-
 }
 
 /*
@@ -136,9 +143,9 @@ int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
 	pName[1] = ':';
 	pName[2] = '/';
 	pName[3] = 0;
-	DIR dir;
+	//DIR dir;
 
-	res = f_opendir(&dir, pName);
+	res = f_opendir(&dirHandle, pName);
 	if (res != FR_OK) {
 		xprintf("Error: f_opendir: %s\n", pName);
 		return -1;
@@ -147,8 +154,8 @@ int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
 	uint8_t searchIdx = 0;
 	while (searchIdx < 254) {
 
-		FILINFO file_info;
-		res = f_readdir(&dir, &file_info);
+		//FILINFO file_info;
+		res = f_readdir(&dirHandle, &filInfoHandle);
 		if (res != FR_OK) {
 			xprintf("Error: f_readdir\n");
 			//f_closedir(dir);
@@ -156,25 +163,25 @@ int8_t mmGetDirectoryInRootNameByIdx(const uint8_t dirIdx, char *pName,
 		}
 
 		//break on end of dir
-		if (file_info.fname[0] == '\0') {
+		if (filInfoHandle.fname[0] == '\0') {
 			//f_closedir(dir);
 			return -1;
 		}
 		MyMusicDB.rootInodes[searchIdx].isUsefull = 0;
-		if ((file_info.fattrib & AM_DIR)) {
+		if ((filInfoHandle.fattrib & AM_DIR)) {
 			*pLastDirFoundCnt = searchIdx + 1;
-			xprintf("found %d :  dir %s \n", searchIdx, file_info.fname);
+			//xprintf("found %d :  dir %s \n", searchIdx, filInfoHandle.fname);
 
 			//todo: should be implemented in the music-file-scanner, otherwise emty/non rerelvant will show up
 			MyMusicDB.rootInodes[searchIdx].isUsefull = 1;
 			if (searchIdx == dirIdx) {
 				//thisi is the dir # we searched for
-				uint8_t length = strlen(file_info.fname);
+				uint8_t length = strlen(filInfoHandle.fname);
 				if (length > MAX_DIR_NAME_LEN)
 					length = MAX_DIR_NAME_LEN;
 
-				*pNameLen = strlen(file_info.fname);
-				strncpy(&(pName[0]), file_info.fname, *pNameLen);
+				*pNameLen = strlen(filInfoHandle.fname);
+				strncpy(&(pName[0]), filInfoHandle.fname, *pNameLen);
 				pName[(*pNameLen)] = 0;
 				*pNameLen += 1;
 				return 1;
@@ -195,23 +202,29 @@ uint8_t runIndexer() {
 	char dirname[MAX_DIR_NAME_LEN];
 
 	mmGetDirectoryInRootNameByIdx(255, &dirname, &len, &lastCount);
+	f_closedir(&dirHandle);
 	MyMusicDB.numOfRootInodes = lastCount;
 
 	char fName[MAX_DIR_NAME_LEN];
 	uint8_t fnameLen, pLas;
 
-	return;
-	for (uint8_t it = 0; it < MyMusicDB.numOfRootInodes; it++) {
+	for (uint8_t dirIdxIt = 0; dirIdxIt < MyMusicDB.numOfRootInodes;
+			dirIdxIt++) {
 		uint8_t current[20];
-		uint8_t len=0;
-		uint8_t foundSongs =0;
-		if(MyMusicDB.rootInodes[it].isUsefull){
-			mmGetDirectoryInRootNameByIdx(it, &current, &len, 0);
-			mmGetFileInDir(255, &current, &foundSongs, 1, 0);
+		uint8_t len = 0;
+		uint8_t foundSongs = 0;
+		if (MyMusicDB.rootInodes[dirIdxIt].isUsefull) {
+
+			mmGetDirectoryInRootNameByIdx(dirIdxIt, &current, &len, 0);
+			xprintf("searching rootnode: %x - %s\n", dirIdxIt, current);
+			f_closedir(&dirHandle);
+			mmGetFileInDir(255, dirIdxIt, &current, &foundSongs, 1, 0, 0);
+			MyMusicDB.rootInodes[dirIdxIt].numberOfTracks = foundSongs;
+			f_closedir(&dirHandle);
 			xprintf("found in %s, %d songs\n", current, foundSongs);
 		}
 		//	uint8_t x = it;
-	//	int8_t ret = 7;
+		//	int8_t ret = 7;
 		//ret = mmGetFileInDirectoryByIdxes //(x, 255, &fName, &len, &lastCount, 1);
 	}
 	int8_t ret = 7;
@@ -221,30 +234,14 @@ uint8_t runIndexer() {
 	 */
 
 	mmGetDirectoryInRootNameByIdx(5, &dirname, &len, &lastCount);
+	f_closedir(&dirHandle);
 
 	char pad[] = "DEMO";
-	char fileN[MAX_DIR_NAME_LEN];
-	mmGetFileInDir(255, pad, &len, 1, &fileN);
+	char retVal[MAX_DIR_NAME_LEN];
+	mmGetFileInDir(4, 4, &pad, 0, 0, &retVal, 0);
+	xprintf("searched for song  file: %s\n, ", retVal);
+	f_closedir(&dirHandle);
 
-	for (uint8_t x = 0; x < MyMusicDB.numOfRootInodes; x++) {
-
-		//ret = mmGetFileInDirectoryByIdxes(x, 255, &fName, &len, &lastCount, 1);
-		xprintf("x: %d - dir: %s\n", x, fName);
-	}
-
-	/*for (uint8_t x = 0; x < 8; x++) {
-	 xprintf("x: %d\n", x);
-	 ret = mmGetFileInDirectoryByIdxes(x, 255, &fName, &len, &lastCount, 1);
-	 }
-	 char n[MAX_DIR_NAME_LEN];
-	 mmGetDirectoryInRootNameByIdx(6, &n, 0, 0);
-	 xprintf("Dir #5 name: %s\n", n);
-
-	 mmGetFileInDirectoryByIdxes(6, 3, &n, 0, 0, 0);
-	 xprintf("Dir #5, File  #3 name: %s\n", n);
-
-	 xprintf("found :%d of files\n", lastCount);
-	 xprintf("filename: %s \n", fName);*/
 	stop = uwTick;
 	xprintf("indexing took: %d\n", (stop - start));
 
@@ -313,6 +310,7 @@ void MMindexerRootfolders() {
 	}
 }
 
+//calculates the actual id, based on relative id's used by assesoire
 uint8_t mmGetActualInodeIdxFromRelative(uint8_t requested) {
 	uint8_t usableCnt = 0;
 
@@ -326,19 +324,47 @@ uint8_t mmGetActualInodeIdxFromRelative(uint8_t requested) {
 	}
 }
 
-void MMResetSelections() {
-	MyMusicDB.selectedRootInode = 0;
+//calculates the actual id, based on relative id's used by assesoire
+uint8_t mmGetActualTrackInodeIdxFromRelative(uint8_t dirIdx, uint8_t requested) {
+	uint8_t usableCnt = 0;
+
+	for (uint8_t x = 0; x < MyMusicDB.rootInodes[dirIdx].numberOfTracks; x++) {
+		if (MyMusicDB.rootInodes[dirIdx].subDirInodes == 1) {
+			if (usableCnt == requested) {
+				return usableCnt;
+			}
+			usableCnt++;
+
+		}
+	}
 }
+
+#define CAT_SELECTED_NONE 0xff
+void MMResetSelections() {
+	MyMusicDB.selectedCategyory = CAT_SELECTED_NONE;
+}
+
+//
 void MMSelectItem(uint8_t category, uint32_t item) {
 	uint8_t req = mmGetActualInodeIdxFromRelative(item);
-	MyMusicDB.selectedRootInode = req;
+
+	if (category == DB_CAT_PLAYLIST) { //playlist
+		MyMusicDB.selectedRootInode = req;
+		MyMusicDB.selectedCategyory = category;
+	}
 }
 /*
  * track stuff
  */
 
 uint8_t MMgetNumberOfTracks() {
-	return MyMusicDB.rootInodes[MyMusicDB.selectedRootInode].numberOfTracks;
+	switch (MyMusicDB.selectedCategyory) {
+	case DB_CAT_PLAYLIST: { //we only report >0 records from the playlist menu
+		return MyMusicDB.rootInodes[MyMusicDB.selectedRootInode].numberOfTracks;
+	}
+	default:
+		return 0;
+	}
 }
 
 /*
@@ -347,6 +373,22 @@ uint8_t MMgetNumberOfTracks() {
 void MMgetPlaylistItem(uint8_t idx, char *content, uint8_t *len) {
 	uint8_t req = mmGetActualInodeIdxFromRelative(idx);
 	mmGetDirectoryInRootNameByIdx(req, content, len, 0);
+
+}
+
+//assumes track's can be retrieved
+void MMgetTracklistItem(uint8_t idx, char *content, uint8_t *len) {
+	xprintf("requested track #%d\n", idx);
+
+	uint8_t reqTrackIdx = mmGetActualTrackInodeIdxFromRelative(
+			MyMusicDB.selectedRootInode, idx);
+	char path[20];
+	mmGetDirectoryInRootNameByIdx(reqTrackIdx, &path, len, 0);
+	f_closedir(&dirHandle);
+
+	mmGetFileInDir(reqTrackIdx, MyMusicDB.selectedRootInode, &path, 0, 0,
+			&content, &len);
+	f_closedir(&dirHandle);
 
 }
 

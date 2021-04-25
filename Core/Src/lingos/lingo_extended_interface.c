@@ -8,7 +8,7 @@
 #include "lingos.h"
 #include "transactionlayer.h"
 #include "stdint.h"
-#include "xprintf.h"
+#include "log.h"
 
 #include "MusicManager.h"
 
@@ -47,7 +47,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		const uint8_t ReturnIndexedPlayingTrackInfo = 0xd;
 		initResponse(LingoExtended, ReturnIndexedPlayingTrackInfo, msg.transID);
 
-		xprintf("trackInfoRequested: %x\n", trackInfoType);
+		LOG("trackInfoRequested: %x\n", trackInfoType);
 		/*
 		 * TODO: plug in meta shizzle
 		 */
@@ -93,9 +93,10 @@ void processLingoExtendedInterface(IAPmsg msg) {
 			addResponsePayload(&empty, sizeof(empty));
 
 		}
-		break;
+			break;
+
 		default:
-			xprintf("unshore how to proceed\n");
+			LOG("unsure how to proceed\n");
 		}
 
 		transmitToAcc();
@@ -104,13 +105,13 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x0e: //GetArtworkFormats
 	{
-		xprintf("GetArtWorkFormats to be implemented\n");
+		LOG("GetArtWorkFormats to be implemented\n");
 	}
 		break;
 
 	case 0x16: //ResetDBSelection
 	{
-		xprintf("ResetDB\n");
+		LOG("ResetDB\n");
 		const cmdToAck = 0x16;
 		const uint8_t success = { 0x00, 0x00, cmdToAck };
 
@@ -128,7 +129,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x17: //SelectDBRecord
 	{
-		xprintf("selectDBRecords \n");
+		LOG("selectDBRecords \n");
 		uint8_t dbCategoryRequested = msg.payload[0];
 		int32_t dbRecordIdx = (msg.payload[1] << 24) | (msg.payload[2] << 16)
 				| (msg.payload[3] << 8) | (msg.payload[4]);
@@ -147,7 +148,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	case 0x18: //GetNumberCategorizedDBRecords
 	{
 		uint8_t catReq = msg.payload[0];
-		xprintf("GetNumberCategorizedDBRecords requested category: %d\n",
+		LOG("GetNumberCategorizedDBRecords cat: %d\n",
 				catReq);
 
 		const uint8_t returnNumberCategorizedDBRecordsCmd = 0x19;
@@ -158,10 +159,12 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		uint32_t numberOfTracks = 0;
 
 		switch (catReq) {
-		case 0x01:
+		case DB_CAT_PLAYLIST:
 			numberOfTracks = MMgetNumberOfPLaylists();
 			break;
 
+		case DB_CAT_TRACK:
+			numberOfTracks=MMgetNumberOfTracks();
 		default:
 			//to implement
 			;
@@ -190,7 +193,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		open_query.type = dbCatType;
 		open_query.start = dbRecordStart;
 		open_query.count = dbRecordCount;
-		xprintf("ass requested record type: %d | start: %d | count: %d\n",
+		LOG("requested record type: %d | s: %d | cnt: %d\n",
 				dbCatType, dbRecordStart, dbRecordCount);
 
 		typeDefTask task;
@@ -202,7 +205,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x1e: //GetCurrentPlayingTrackIndex
 	{
-		xprintf("GetCurrentPlayingTrackIndex\n");
+		LOG("GetCurrentPlayingTrackIndex\n");
 		const uint8_t ReturnCurrentPlayingTrackIndexCmd = 0x1f;
 		initResponse(LingoExtended, ReturnCurrentPlayingTrackIndexCmd,
 				msg.transID);
@@ -236,7 +239,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x26: //setPlayStatusChangeNotification
 	{
-		xprintf("ass requested play-event-updates\n");
+		LOG("subscribe play-event-updates\n");
 
 		const uint8_t success = 0x00;
 
@@ -252,7 +255,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	{
 		const cmdToAck = 0x28;
 		const uint8_t success = { 0x00, 0x00, cmdToAck };
-
+		LOG("Play current Selection..\n");
 		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
 		initResponse(LingoExtended, EXTENDED_ACK_CMD, msg.transID);
 		addResponsePayload(&success, sizeof(success));
@@ -293,7 +296,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		addResponsePayload(&shuffleTracks, sizeof(shuffleTracks));
 		transmitToAcc();
 
-		xprintf("bogus track-change on track-reading\n");
+		LOG("bogus track-change on track-reading\n");
 		typeDefTask task;
 		task.f = &taskTrackChanged;
 		task.scheduledAfter = uwTick + 2000;
@@ -304,6 +307,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x31: //Set Repeat
 	{
+		LOG("set repeat\n");
 		uint8_t newRepeateState = msg.payload[0];
 		uint8_t setOnRestore = msg.payload[1];
 	}
@@ -311,6 +315,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 
 	case 0x2e: //SetShuffle
 	{
+		LOG("set shuffle\n");
 		uint8_t newShuffleState = msg.payload[0];
 		uint8_t setOnRestore = msg.payload[1];
 
@@ -321,6 +326,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 	{
 		const uint8_t ReturnRepeatCMD = 0x30;
 		const uint8_t repeatTracks = 0x00;
+		LOG("get repeat\n");
 
 		//USBD_HID_SendReport(&hUsbDeviceFS, report, sizeof(report));
 		initResponse(LingoExtended, ReturnRepeatCMD, msg.transID);
@@ -330,7 +336,7 @@ void processLingoExtendedInterface(IAPmsg msg) {
 		break;
 
 	default:
-		xprintf("Extended Lingo cmd: %x not implemented\n", msg.commandId);
+		LOG("Ext Lingo cmd: %x not implm.\n", msg.commandId);
 	}
 }
 
@@ -363,6 +369,9 @@ void taskProcessQuery() {
 		initResponse(LingoExtended, returnCategorizedDatabaseRecordCmd,
 				podTransactionCounter);
 
+		uint8_t content[50];
+		uint8_t len = 0;
+
 		switch (open_query.type) {
 		case DB_CAT_TOP: {
 			prepareRecord(open_query.start, "TOP", 3);
@@ -372,8 +381,6 @@ void taskProcessQuery() {
 			break;
 
 		case DB_CAT_PLAYLIST: {
-			uint8_t content[50];
-			uint8_t len=0;
 			MMgetPlaylistItem(open_query.start, &content, &len);
 			prepareRecord(open_query.start, &content, len);
 			{
@@ -394,16 +401,23 @@ void taskProcessQuery() {
 			break;
 
 		case DB_CAT_TRACK: {
-			prepareRecord(open_query.start, "Track something", 15);
+			//prepareRecord(open_query.start, "Track something", 15);
+
+			MMgetTracklistItem(open_query.start, &content, &len);
+			//MMgetPlaylistItem(open_query.start, &content, &len);
+			prepareRecord(open_query.start, &content, len);
+			{
+
+			}
 
 		}
 			break;
 
 		default:
-			xprintf("query cat type not implemented \n");
+			LOG("query cat type not implemented \n");
 			return;
 		}
-		xprintf("sending record to Acc\n");
+		LOG("sending record\n");
 		addResponsePayload(&db_record_to_send, sizeof(db_record_to_send));
 		transmitToAcc();
 
@@ -422,7 +436,7 @@ void taskProcessQuery() {
 }
 
 void taskPlayControlCommand() {
-	xprintf("handeling playcontrol req\n");
+	LOG("handeling playcontrol req\n");
 	uint8_t trackCHangeAction = 0;
 	switch (playbackStatus.lastReceivedCommand) {
 
@@ -469,7 +483,7 @@ void taskPlayControlCommand() {
 }
 
 void taskTrackChanged() {
-	xprintf("TrackChanged\n");
+	LOG("TrackChanged\n");
 	//do something
 	const uint8_t TrackNewAudioAttributes = 0x04;
 	uint8_t payload[12] = { 0 };

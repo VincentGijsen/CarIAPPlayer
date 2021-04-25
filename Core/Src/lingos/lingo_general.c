@@ -10,7 +10,7 @@
 
 #include "stdint.h"
 
-#include "xprintf.h"
+#include "log.h"
 
 typedef enum {
 	UNDEF = 0, StartIDPS_INIT, TRANSPORT_RESET, NEGOTIATE1,
@@ -28,7 +28,7 @@ void processLingoGeneral(IAPmsg msg) {
 
 	case 0x03: //RequestExtendedInterfaceMode
 	{
-		xprintf("extended mode requested\n");
+		LOG("extended mode requested\n");
 		const uint8_t returnExtendedINterfaceMode = 0x04;
 		const uint8_t true = 1;
 		initResponse(LingoGeneral, returnExtendedINterfaceMode, msg.transID);
@@ -50,33 +50,33 @@ void processLingoGeneral(IAPmsg msg) {
 	case 0x0f: //	RequestLingoProtocolVersion
 	{
 		uint8_t requested_lingo_version = msg.payload[0];
-		xprintf("requested lingo version for : %x\n", requested_lingo_version);
+		LOG("requested lingo version for : %x\n", requested_lingo_version);
 
 		uint8_t pL[3] = { requested_lingo_version, 0, 0 };
 
 		switch (requested_lingo_version) {
 		case 0x00: //general
-		pL[1] = 1;
-		pL[2] = 9;
-		break;
+			pL[1] = 1;
+			pL[2] = 9;
+			break;
 
-	case 0x03: //display remote
-		pL[1] = 1;
-		pL[2] = 0;
-		break;
+		case 0x03: //display remote
+			pL[1] = 1;
+			pL[2] = 0;
+			break;
 
-	case 0x04: //extended lingo
-		pL[1] = 1;
-		pL[2] = 14;
-		break;
+		case 0x04: //extended lingo
+			pL[1] = 1;
+			pL[2] = 14;
+			break;
 
-	case 0x10: //digital audio
-		pL[1] = 1;
-		pL[2] = 2;
-		break;
+		case 0x10: //digital audio
+			pL[1] = 1;
+			pL[2] = 2;
+			break;
 
-	default:
-		xprintf("unimplemented lingo-version-req");
+		default:
+			LOG("unimplemented lingo-version-req");
 		}
 
 		addResponsePayload(&pL, sizeof(pL));
@@ -88,6 +88,7 @@ void processLingoGeneral(IAPmsg msg) {
 	case 0x38: { //startDS
 		//p252 MFiAccessoryFirmwareSpecificationR46NoRestriction.
 		//STARTIPS process stap
+		LOG("StartIPS\n");
 		uint8_t pkg_len = 6; //lingo, cmd, 2(trans) payload(2),
 		uint8_t lingo = 0; //general
 		uint8_t cmd = 0x02; //ipod ack
@@ -100,7 +101,7 @@ void processLingoGeneral(IAPmsg msg) {
 		addResponsePayload(&pL, sizeof(pL));
 		transmitToAcc();
 
-		xprintf("send IPOD_ACK\n");
+		DEBUG("send IPOD_ACK\n");
 		//_transState.lastCmd = UNDEF;
 	}
 		break;
@@ -125,41 +126,41 @@ void processLingoGeneral(IAPmsg msg) {
 
 			if (tFidType == 0x00) {
 				if (tFidSubType == 0x00) {
-					xprintf("IdentityToken : ");
+					DEBUG("IdentityToken : ");
 					uint8_t identAck[] = { 0x03, tFidType, tFidSubType, 0 };
 					addResponsePayload(identAck, sizeof(identAck));
-					xprintf("num lingos: %d\n", tdataStart);
-					xprintf("supported lingos: ");
+					DEBUG("num lingos: %d\n", tdataStart);
+					DEBUG("supported lingos: ");
 					for (uint8_t it = 0; it < tdataStart; it++) {
-						xprintf("%d ", msg.payload[tokenStartIdx + 4 + it]);
+						LOG("%d ", msg.payload[tokenStartIdx + 4 + it]);
 					}
 
 					uint8_t devOptIdx = msg.payload[tokenStartIdx + 3
 							+ tdataStart + 4];
-					xprintf("device options: %b\n", +msg.payload[devOptIdx]);
+					LOG("device options: %b\n", +msg.payload[devOptIdx]);
 
 				} else if (tFidSubType == 0x01) {
-					xprintf("AccessoryCapsToken:\n");
+					DEBUG("AccessoryCapsToken:\n");
 					uint8_t accCapAck[] = { 0x03, tFidType, tFidSubType, 0 };
 					addResponsePayload(accCapAck, sizeof(accCapAck));
 					for (uint8_t x = 0; x < 8; x++) {
-						//xprintf("cap b%d: %b \n",
+						//LOG("cap b%d: %b \n",
 						//		msg.raw[tokenStartIdx + 3 + x]);
 					}
 
 				} else if (tFidSubType == 0x02) {
 
-					xprintf("AccessoryInfoToken: ");
+					DEBUG("AccessoryInfoToken: ");
 					uint8_t accInfoAck[] = { 0x04, tFidType, tFidSubType, 0,
 							tdataStart };
 					addResponsePayload(accInfoAck, sizeof(accInfoAck));
 
 					if (tdataStart == 0x01) {
-						xprintf("name: ");
+						DEBUG("name: ");
 						uint8_t idx = 1;
 						while (idx) {
 							char c = msg.payload[tokenStartIdx + 3 + idx];
-							xprintf("%c", c);
+							LOG("%c", c);
 							if (c == '\0')
 								break;
 							idx++;
@@ -167,17 +168,17 @@ void processLingoGeneral(IAPmsg msg) {
 
 					}
 					if (tdataStart == 0x04) {
-						xprintf("FW: %x %x %x ",
+						DEBUG("FW: %x %x %x ",
 								msg.payload[tokenStartIdx + 3 + 1],
 								msg.payload[tokenStartIdx + 3 + 2],
 								msg.payload[tokenStartIdx + 3 + 3]);
 					}
 					if (tdataStart == 0x06) {
-						xprintf("Manufact: ");
+						DEBUG("Manufact: ");
 						uint8_t idx = 1;
 						while (idx) {
 							char c = msg.payload[tokenStartIdx + 3 + idx];
-							xprintf("%c", c);
+							DEBUG("%c", c);
 							if (c == '\0')
 								break;
 							idx++;
@@ -186,26 +187,26 @@ void processLingoGeneral(IAPmsg msg) {
 					}
 
 				} else if (tFidSubType == 0x03) {
-					xprintf("iPodPreferenceToken: ");
+					DEBUG("iPodPreferenceToken: ");
 					uint8_t accipodPrefTokenInfoAck[] = { 0x04, tFidType,
 							tFidSubType, 0, tdataStart };
 					addResponsePayload(accipodPrefTokenInfoAck,
 							sizeof(accipodPrefTokenInfoAck));
 
 				} else if (tFidSubType == 0x04) {
-					xprintf("EAProtocolToken: ");
+					DEBUG("EAProtocolToken: ");
 					uint8_t accEapProAcc[] = { 0x04, tFidType, tFidSubType, 0,
 							tdataStart };
 					addResponsePayload(accEapProAcc, sizeof(accEapProAcc));
 				} else {
-					xprintf("Other Token: ");
+					DEBUG("Other Token: ");
 				}
 				if (tFidType == 0x00 && tFidSubType == 0x0e) {
-					xprintf("AccessoryDigital-AudioSampleRates-Token\n");
+					DEBUG("AccessoryDigital-AudioSampleRates-Token\n");
 				}
 
 			}
-			xprintf("len: %d, type: %X, subType: %x \n", tLeng, tFidType,
+			DEBUG("len: %d, type: %X, subType: %x \n", tLeng, tFidType,
 					tFidSubType);
 
 			//prep for next token
@@ -255,7 +256,7 @@ void processLingoGeneral(IAPmsg msg) {
 			break;
 		case 0x0a: //digital audio lingo
 		{
-			xprintf("digtal audio supported by pod\n");
+			LOG("digtal audio supported by pod\n");
 			caps[1] = (1 << 0); //digital audio on
 		}
 			break;
@@ -279,7 +280,7 @@ void processLingoGeneral(IAPmsg msg) {
 		switch (accEndIDPSStatus) {
 		case 0x00: {
 			//ok, continue
-			xprintf("acc ok, proceed authentication please...\n");
+			LOG("acc ok, proceed authentication please...\n");
 			const uint8_t cmd = 0x3c; //IDPSstatus
 			const uint8_t status = 0x00; //we're happy with tokens
 
@@ -297,11 +298,11 @@ void processLingoGeneral(IAPmsg msg) {
 			break;
 
 		case 0x01: //request reset ipss
-			xprintf("acc requested reset of IDPS\n");
+			LOG("acc requested reset of IDPS\n");
 			break;
 
 		default:
-			xprintf("issue to connect IDPS\n");
+			LOG("issue to connect IDPS\n");
 		}
 	}
 		break;
@@ -310,16 +311,16 @@ void processLingoGeneral(IAPmsg msg) {
 	{
 		//const uint8_t RetAccessoryAuthenticationInfo = 0;
 
-		//xprintf("accc provided auth info\n");
+//LOG("acc provided auth info\n");
 
 		if (msg.payload[0] == 0x02 && msg.payload[1] == 0x00) {
-			//xprintf("Acc uses authentication 2.0\n");
+			//LOG("Acc uses authentication 2.0\n");
 			//iap 2 auth system
 			uint8_t certCurSect = msg.payload[2];
 			uint8_t certMaxSect = msg.payload[3];
 
 			if (certCurSect < certMaxSect) {
-				xprintf("got partical cert: %d/%d \n", certCurSect,
+				DEBUG("got partical cert: %d/%d \n", certCurSect,
 						certMaxSect);
 				//ack for next run, else proceed
 				const uint8_t cmdstatus = 0x00; //success
@@ -332,10 +333,10 @@ void processLingoGeneral(IAPmsg msg) {
 
 			} else { //AckAccessoryAuthenticationInfo
 
-				xprintf("got last part: %d/%d \n", certCurSect, certMaxSect);
-				//xprintf("all sections of cert are transmitted\n");
+				DEBUG("got last part: %d/%d \n", certCurSect, certMaxSect);
+				//LOG("all sections of cert are transmitted\n");
 
-				xprintf("ack all info\n");
+				DEBUG("ack all info\n");
 
 				//we pretend, we looked at the certificate, and reply all is ok:
 				const uint8_t AckAccessoryAuthenticationInfo = 0x16;
@@ -346,20 +347,22 @@ void processLingoGeneral(IAPmsg msg) {
 				transmitToAcc();
 
 				/*//get sample rate
-				 xprintf("get samplerate\n");
+				 LOG("get samplerate\n");
 				 podTransactionCounter++;
 				 const uint8_t GetAccessorySampleRateCaps = 0x02;
 				 initResponse(LingoGeneral, GetAccessorySampleRateCaps,
 				 podTransactionCounter);
 
 				 transmitToAcc();*/
+#ifdef FALSE
 				for (uint8_t x = 0; x < 254; x++) {
 					for (uint8_t y = 0; y < 254; y++) {
 						asm("nop");
 					}
 				}
+#endif
 				//send signature req:
-				xprintf("ask challenge\n");
+				LOG("ask challenge\n");
 
 				//podTransactionCounter++;
 				//DONT_ICNREMENT_TRANSACTION_COUNTER
@@ -375,7 +378,7 @@ void processLingoGeneral(IAPmsg msg) {
 
 			}
 		} else {
-			xprintf("Auth 1.0 not implemented!\n");
+			LOG("Auth 1.0 not implemented!\n");
 		}
 
 	}
@@ -384,7 +387,7 @@ void processLingoGeneral(IAPmsg msg) {
 	case 0x18: //RetAccessoryAuthenticationSignature
 	{
 		//should contain the challenged signature
-		xprintf("Challenge Returned :): cmd: %x\n", msg.commandId);
+		LOG("Challenge Returned :): cmd: %x\n", msg.commandId);
 		//podTransactionCounter++;
 		const uint8_t AckAuthStatus = 0x19;
 		uint8_t authOk = 0x00;
@@ -396,8 +399,20 @@ void processLingoGeneral(IAPmsg msg) {
 	}
 		break;
 
+	case 0xEE: { //requested iap2 sesion, as not-implemented; return error
+		LOG("IAP2 requested; return unsupported\n");
+		const uint8_t cmdstatus = 0x04; //Error
+		const uint8_t origCmdID = 0xEE; //origCmdID?
+		const uint8_t pL[2] = { cmdstatus, origCmdID };
+
+		initResponse(LingoGeneral, 0x02, transactionAuthstartId);
+		addResponsePayload(&pL, sizeof(pL));
+		transmitToAcc();
+	}
+		break;
+
 	default:
-		xprintf("unknown General cmnd: %x", msg.commandId);
+		LOG("unknown General cmnd: %x", msg.commandId);
 		;
 	}
 
@@ -407,7 +422,7 @@ void processLingoGeneral(IAPmsg msg) {
 
 void taskInitializeAuthentication() {
 	//triggerd by timed-event
-	xprintf("taskInitializeAuthentication called\n");
+	LOG("taskInitializeAuthentication called\n");
 	const uint8_t GetAccessoryAuthenicatationInfo = 0x14;
 
 	transactionAuthstartId = podTransactionCounter + 1;
